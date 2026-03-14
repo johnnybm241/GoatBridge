@@ -226,9 +226,12 @@ describe('socket integration', () => {
       });
 
       socket.on('trick_complete', (payload: TrickCompletePayload) => {
+        // currentTurn is already set from the preceding card_played event;
+        // just reset the trick. Don't call maybeAct() here — card_played
+        // already triggered it, and calling it again would cause a double-play
+        // when the human wins a trick.
         currentTurn = payload.nextLead;
         currentTrick = { cards: [], leader: payload.nextLead, winner: null };
-        maybeAct();
       });
 
       socket.on('hand_complete', (payload: HandCompletePayload) => {

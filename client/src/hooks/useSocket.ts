@@ -23,6 +23,7 @@ export function useSocketEvents() {
 
     socket.on('room_joined', (payload) => {
       store.setRoom(payload.roomCode, payload.hostUserId, payload.isSpectator);
+      store.setRoomLobby(payload.seats, payload.kibitzingAllowed, payload.spectators);
       if (payload.seats) {
         const yourUserId = authStore.userId;
         for (const s of SEATS) {
@@ -35,6 +36,7 @@ export function useSocketEvents() {
     });
 
     socket.on('room_updated', (payload) => {
+      store.setRoomLobby(payload.seats as Record<Seat, SeatInfo>, payload.kibitzingAllowed, payload.spectators);
       if (store.gameState) {
         store.setGameState({ ...store.gameState, seats: payload.seats as Record<Seat, SeatInfo>, kibitzingAllowed: payload.kibitzingAllowed, spectators: payload.spectators });
       }
@@ -43,6 +45,7 @@ export function useSocketEvents() {
     socket.on('game_started', (payload) => {
       store.setGameState(payload.gameState);
       store.setYourHand(payload.yourHand);
+      store.setLastHandResult(null);
     });
 
     socket.on('bid_made', (payload) => {
@@ -91,10 +94,16 @@ export function useSocketEvents() {
       });
     });
 
-    socket.on('hand_complete', (_payload) => {
+    socket.on('hand_complete', (payload) => {
       const gs = store.gameState;
       if (!gs) return;
       store.setGameState({ ...gs, phase: 'scoring' });
+      store.setLastHandResult({
+        contract: payload.contract,
+        declarer: payload.declarer,
+        tricksMade: payload.tricksMade,
+        contractMade: payload.handScore.contractMade,
+      });
     });
 
     socket.on('score_update', (payload) => {
@@ -123,6 +132,18 @@ export function useSocketEvents() {
 
     return () => {
       registered.current = false;
+      socket.off('room_joined');
+      socket.off('room_updated');
+      socket.off('game_started');
+      socket.off('bid_made');
+      socket.off('auction_complete');
+      socket.off('dummy_revealed');
+      socket.off('card_played');
+      socket.off('trick_complete');
+      socket.off('hand_complete');
+      socket.off('score_update');
+      socket.off('rubber_complete');
+      socket.off('chat_message');
     };
   }, []);
 }

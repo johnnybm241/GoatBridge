@@ -1,4 +1,4 @@
-import type { GameState, Seat, Card as CardType } from '@goatbridge/shared';
+import type { GameState, Seat, Card as CardType, Contract } from '@goatbridge/shared';
 import { SEATS } from '@goatbridge/shared';
 import Hand from './Hand.js';
 import DummyHand from './DummyHand.js';
@@ -8,6 +8,7 @@ import TrickArea from './TrickArea.js';
 import SeatNameplate from './SeatNameplate.js';
 import Scoreboard from './Scoreboard.js';
 import type { BidCall } from '@goatbridge/shared';
+import { getSocket } from '../../socket.js';
 
 interface BridgeTableProps {
   gameState: GameState;
@@ -16,6 +17,9 @@ interface BridgeTableProps {
   onBid: (call: BidCall) => void;
   onPlay: (card: CardType) => void;
   isYourTurn: boolean;
+  isHost: boolean;
+  roomCode: string;
+  lastHandResult: { contract: Contract; declarer: Seat; tricksMade: number; contractMade: boolean } | null;
 }
 
 export default function BridgeTable({
@@ -25,6 +29,9 @@ export default function BridgeTable({
   onBid,
   onPlay,
   isYourTurn,
+  isHost,
+  roomCode,
+  lastHandResult,
 }: BridgeTableProps) {
   const { phase, bidding, currentTurn, contract, declarer, dummy, dummyHand, seats, trickCounts, scores, vulnerability } = gameState;
 
@@ -173,6 +180,39 @@ export default function BridgeTable({
             onBid={onBid}
             disabled={!isYourTurn}
           />
+        </div>
+      )}
+
+      {/* Scoring overlay after hand completes */}
+      {phase === 'scoring' && lastHandResult && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-navy/70">
+          <div className="bg-navy border border-gold/40 rounded-2xl p-6 text-center shadow-2xl space-y-3 min-w-[260px]">
+            <div className="text-gold font-bold text-xl">Hand Complete</div>
+            <div className="text-cream text-lg font-semibold">
+              {lastHandResult.contract.level}
+              {lastHandResult.contract.strain === 'notrump' ? 'NT' : lastHandResult.contract.strain[0]?.toUpperCase()}
+              {lastHandResult.contract.doubled === 'doubled' ? 'x' : lastHandResult.contract.doubled === 'redoubled' ? 'xx' : ''}
+              {' '}by {lastHandResult.declarer}
+            </div>
+            <div className={`text-2xl font-bold ${lastHandResult.contractMade ? 'text-green-400' : 'text-red-400'}`}>
+              {lastHandResult.contractMade
+                ? `Made${lastHandResult.tricksMade > lastHandResult.contract.level + 6 ? ` +${lastHandResult.tricksMade - lastHandResult.contract.level - 6}` : ''}`
+                : `Down ${lastHandResult.contract.level + 6 - lastHandResult.tricksMade}`}
+            </div>
+            {isHost && !gameState.scores.isComplete && (
+              <button
+                onClick={() => getSocket().emit('start_game', { roomCode })}
+                className="mt-2 w-full bg-gold hover:bg-gold/80 text-navy font-bold py-2 rounded-lg transition-colors"
+              >
+                Deal Next Hand
+              </button>
+            )}
+            {gameState.scores.isComplete && (
+              <div className="text-gold font-bold text-lg pt-1">
+                🐐 Rubber complete!
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

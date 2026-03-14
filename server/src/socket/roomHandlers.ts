@@ -394,8 +394,8 @@ export function setupRoomHandlers(
 
       scheduleAIActionIfNeeded(
         currentRoom,
-        (s, call) => onBid(currentRoom, s),
-        (s, card) => onPlay(currentRoom, s),
+        (s, call) => onBid(currentRoom, s, call),
+        (s, card) => onPlay(currentRoom, s, card),
       );
     }, 60000);
 

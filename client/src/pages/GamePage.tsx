@@ -27,6 +27,10 @@ export default function GamePage() {
     isYourTurn,
     goatToast,
     clearGoatToast,
+    roomSeats,
+    roomKibitzingAllowed,
+    roomSpectators,
+    lastHandResult,
   } = useGameState();
 
   useSocketEvents();
@@ -87,6 +91,9 @@ export default function GamePage() {
               onBid={handleBid}
               onPlay={handlePlay}
               isYourTurn={isYourTurn()}
+              isHost={isHost}
+              lastHandResult={lastHandResult}
+              roomCode={roomCode!}
             />
           ) : (
             <WaitingRoom
@@ -104,9 +111,9 @@ export default function GamePage() {
           <HostAdminPanel
             roomCode={roomCode!}
             gameState={gameState}
-            seats={gameState?.seats ?? ({} as Record<Seat, { userId: string | null; isAI: boolean; displayName: string }>)}
-            kibitzingAllowed={gameState?.kibitzingAllowed ?? true}
-            spectators={gameState?.spectators ?? []}
+            seats={roomSeats ?? ({} as Record<Seat, { userId: string | null; isAI: boolean; displayName: string }>)}
+            kibitzingAllowed={roomKibitzingAllowed}
+            spectators={roomSpectators}
           />
         )}
 

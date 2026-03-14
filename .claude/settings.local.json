@@ -9,7 +9,24 @@
       "Bash(git config:*)",
       "Bash(git push:*)",
       "Bash(timeout 5 node --input-type=module <<'EOF' 2>&1 || true\nimport initSqlJs from 'sql.js';\nconst SQL = await initSqlJs\\(\\);\nconsole.log\\('sql.js loaded OK'\\);\nconst db = new SQL.Database\\(\\);\ndb.exec\\('CREATE TABLE test \\(id TEXT\\)'\\);\ndb.run\\('INSERT INTO test VALUES \\(?\\)', ['hello']\\);\nconst stmt = db.prepare\\('SELECT id FROM test'\\);\nstmt.bind\\([]\\);\nconst row = stmt.step\\(\\) ? stmt.getAsObject\\(\\) : null;\nstmt.free\\(\\);\nconsole.log\\('row:', row\\);\nEOF)",
-      "Bash(npm ls:*)"
+      "Bash(npm ls:*)",
+      "Bash(taskkill /F /IM node.exe 2>&1; sleep 2; echo \"killed\")",
+      "Bash(taskkill //F //IM node.exe 2>&1; sleep 2; echo \"killed\")",
+      "Bash(start http://localhost:5173 2>&1)",
+      "WebFetch(domain:localhost)",
+      "Bash(curl -s http://localhost:3001/health 2>&1 || curl -s http://localhost:3001/ 2>&1 | head -50)",
+      "Bash(curl -s http://localhost:5173/ 2>&1 | head -30)",
+      "Bash(curl -s http://localhost:3001/auth/register -X POST -H \"Content-Type: application/json\" -d '{\"username\":\"Alice\",\"email\":\"alice@test.com\",\"password\":\"password123\"}' 2>&1)",
+      "Bash(# Check the auth routes to understand registration/login API)",
+      "Bash(sqlite3 C:/Users/johnn/workspace/GoatBridge/server/data/goatbridge.db \"SELECT id, username, email FROM users;\" 2>&1)",
+      "Bash(node -e \"\nconst Database = require\\('better-sqlite3'\\);\nconst db = new Database\\('C:/Users/johnn/workspace/GoatBridge/server/data/goatbridge.db'\\);\nconst users = db.prepare\\('SELECT id, username, email FROM users'\\).all\\(\\);\nconsole.log\\(JSON.stringify\\(users, null, 2\\)\\);\ndb.close\\(\\);\n\" 2>&1)",
+      "Bash(node -e \"\nconst Database = require\\('C:/Users/johnn/workspace/GoatBridge/node_modules/better-sqlite3'\\);\nconst db = new Database\\('C:/Users/johnn/workspace/GoatBridge/server/data/goatbridge.db'\\);\nconst users = db.prepare\\('SELECT id, username, email FROM users'\\).all\\(\\);\nconsole.log\\(JSON.stringify\\(users, null, 2\\)\\);\ndb.close\\(\\);\n\" 2>&1)",
+      "Bash(# Check what DB library is actually being used)",
+      "Bash(grep -rn \"currentBidder\\\\|biddingHistory\\\\|nextBidder\" C:/Users/johnn/workspace/GoatBridge/client/src/ | head -20\ngrep -rn \"currentBidder\\\\|biddingHistory\\\\|nextBidder\" C:/Users/johnn/workspace/GoatBridge/shared/src/ | head -20)",
+      "Bash(curl -s --max-time 5 \"http://localhost:3001/health\" 2>&1)",
+      "Bash(curl -s --max-time 5 http://localhost:5173/ 2>&1 | head -5)",
+      "Bash(curl -s --max-time 5 http://127.0.0.1:3001/health 2>&1)",
+      "Bash(netstat -ano 2>/dev/null | grep \":3001\" | head -10)"
     ]
   }
 }
