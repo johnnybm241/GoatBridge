@@ -48,7 +48,7 @@ export function useSocketEvents() {
     socket.on('bid_made', (payload) => {
       const gs = store.gameState;
       if (!gs) return;
-      store.setGameState({ ...gs, bidding: payload.bidding, currentTurn: gs.currentTurn });
+      store.setGameState({ ...gs, bidding: payload.bidding, currentTurn: payload.currentTurn });
     });
 
     socket.on('auction_complete', (payload) => {
@@ -71,7 +71,7 @@ export function useSocketEvents() {
     socket.on('card_played', (payload) => {
       const gs = store.gameState;
       if (!gs) return;
-      store.setGameState({ ...gs, currentTrick: payload.currentTrick });
+      store.setGameState({ ...gs, currentTrick: payload.currentTrick, currentTurn: payload.currentTurn });
       // Remove from hand if it was our card
       const seat = store.yourSeat;
       if (payload.seat === seat || (gs.declarer === seat && payload.seat === gs.dummy)) {

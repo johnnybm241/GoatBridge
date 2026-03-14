@@ -11,6 +11,8 @@ export interface AIAction {
 }
 
 function delay(): number {
+  // Use minimal delay in test environment to keep test suite fast
+  if (process.env.VITEST || process.env.NODE_ENV === 'test') return 10;
   return 800 + Math.random() * 700; // 800-1500ms
 }
 

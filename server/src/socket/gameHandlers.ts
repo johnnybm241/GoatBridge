@@ -33,6 +33,7 @@ export function setupGameHandlers(
       seat,
       call: payload.call,
       bidding: result.game.bidding,
+      currentTurn: result.game.currentTurn!,
     });
 
     if (result.type === 'auction_complete') {
@@ -74,6 +75,7 @@ export function setupGameHandlers(
         seat: room.game!.dummy!,
         card: payload.card,
         currentTrick: result.game.currentTrick!,
+        currentTurn: result.game.currentTurn,
       });
       emitToRoom(io, payload.roomCode, 'dummy_revealed', {
         dummy: room.game!.dummy!,
@@ -84,12 +86,14 @@ export function setupGameHandlers(
         seat,
         card: payload.card,
         currentTrick: result.game.currentTrick!,
+        currentTurn: result.game.currentTurn,
       });
     } else if (result.type === 'trick_complete') {
       emitToRoom(io, payload.roomCode, 'card_played', {
         seat,
         card: payload.card,
         currentTrick: result.trick,
+        currentTurn: result.game.currentTurn,
       });
       emitToRoom(io, payload.roomCode, 'trick_complete', {
         trick: result.trick,
@@ -102,6 +106,7 @@ export function setupGameHandlers(
         seat,
         card: payload.card,
         currentTrick: result.game.completedTricks[result.game.completedTricks.length - 1]!,
+        currentTurn: null,
       });
 
       const declarerSide: 'ns' | 'ew' =
@@ -221,6 +226,7 @@ export function handleAIBid(io: Server, roomCode: string, seat: Seat, call: BidC
     seat,
     call,
     bidding: result.game.bidding,
+    currentTurn: result.game.currentTurn!,
   });
 
   if (result.type === 'auction_complete') {
@@ -251,15 +257,16 @@ export function handleAIPlay(io: Server, roomCode: string, seat: Seat, card: Car
       seat,
       card,
       currentTrick: result.game.currentTrick!,
+      currentTurn: result.game.currentTurn,
     });
     emitToRoom(io, roomCode, 'dummy_revealed', {
       dummy: room.game!.dummy!,
       dummyHand: result.dummyHand,
     });
   } else if (result.type === 'card_played') {
-    emitToRoom(io, roomCode, 'card_played', { seat, card, currentTrick: result.game.currentTrick! });
+    emitToRoom(io, roomCode, 'card_played', { seat, card, currentTrick: result.game.currentTrick!, currentTurn: result.game.currentTurn });
   } else if (result.type === 'trick_complete') {
-    emitToRoom(io, roomCode, 'card_played', { seat, card, currentTrick: result.trick });
+    emitToRoom(io, roomCode, 'card_played', { seat, card, currentTrick: result.trick, currentTurn: result.game.currentTurn });
     emitToRoom(io, roomCode, 'trick_complete', {
       trick: result.trick,
       winner: result.winner,
@@ -271,6 +278,7 @@ export function handleAIPlay(io: Server, roomCode: string, seat: Seat, card: Car
       seat,
       card,
       currentTrick: result.game.completedTricks[result.game.completedTricks.length - 1]!,
+      currentTurn: null,
     });
     emitToRoom(io, roomCode, 'hand_complete', {
       handScore: {

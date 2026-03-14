@@ -33,6 +33,7 @@ export interface BidMadePayload {
   seat: Seat;
   call: BidCall;
   bidding: BiddingState;
+  currentTurn: Seat;
 }
 
 export interface AuctionCompletePayload {
@@ -51,6 +52,7 @@ export interface CardPlayedPayload {
   seat: Seat;
   card: Card;
   currentTrick: Trick;
+  currentTurn: Seat | null;
 }
 
 export interface TrickCompletePayload {

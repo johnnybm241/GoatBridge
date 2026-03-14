@@ -112,7 +112,7 @@ export function processBid(room: GameRoom, seat: Seat, call: BidCall): BidResult
       contract,
       declarer,
       dummy,
-      currentTurn: nextSeat(dummy), // player to the left of dummy leads first
+      currentTurn: nextSeat(declarer), // opening lead by player to the left of declarer
     };
     room.game = updatedGame;
     return { type: 'auction_complete', game: updatedGame, passedOut: false };

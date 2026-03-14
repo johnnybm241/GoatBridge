@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls /c/Users/johnn/workspace/GoatBridge && git -C /c/Users/johnn/workspace/GoatBridge log --oneline -10 && git -C /c/Users/johnn/workspace/GoatBridge status)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git config:*)",
+      "Bash(git push:*)",
+      "Bash(timeout 5 node --input-type=module <<'EOF' 2>&1 || true\nimport initSqlJs from 'sql.js';\nconst SQL = await initSqlJs\\(\\);\nconsole.log\\('sql.js loaded OK'\\);\nconst db = new SQL.Database\\(\\);\ndb.exec\\('CREATE TABLE test \\(id TEXT\\)'\\);\ndb.run\\('INSERT INTO test VALUES \\(?\\)', ['hello']\\);\nconst stmt = db.prepare\\('SELECT id FROM test'\\);\nstmt.bind\\([]\\);\nconst row = stmt.step\\(\\) ? stmt.getAsObject\\(\\) : null;\nstmt.free\\(\\);\nconsole.log\\('row:', row\\);\nEOF)",
+      "Bash(npm ls:*)"
+    ]
+  }
+}
