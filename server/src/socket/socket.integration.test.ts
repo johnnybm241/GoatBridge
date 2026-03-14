@@ -113,6 +113,10 @@ describe('socket integration', () => {
 
       const socket = connectSocket(serverUrl, token);
 
+      // Always disconnect socket when test ends (pass or fail)
+      // so the server can close cleanly in afterAll
+      const cleanup = () => { if (socket.connected) socket.disconnect(); };
+
       // State tracked inside event handlers
       let ourSeat: Seat | null = null;
       let ourHand: Card[] = [];
@@ -128,8 +132,8 @@ describe('socket integration', () => {
       let rejectHandComplete!: (e: Error) => void;
       const handCompletePromise = new Promise<HandCompletePayload>(
         (res, rej) => {
-          resolveHandComplete = res;
-          rejectHandComplete = rej;
+          resolveHandComplete = (v) => { cleanup(); res(v); };
+          rejectHandComplete = (e) => { cleanup(); rej(e); };
         },
       );
 
@@ -196,14 +200,19 @@ describe('socket integration', () => {
 
       socket.on('bid_made', (payload: BidMadePayload) => {
         currentTurn = payload.currentTurn;
-        maybeAct();
+        // Don't act on the last bid — auction_complete will fire next and
+        // trigger maybeAct() once phase is updated to 'playing'
+        if (!payload.bidding.isComplete) {
+          maybeAct();
+        }
       });
 
       socket.on('auction_complete', (payload: AuctionCompletePayload) => {
         phase = 'playing';
         declarer = payload.declarer;
         dummy = payload.dummy;
-        // currentTurn will be updated via the next card_played event
+        // Trigger opening lead if it's our turn (currentTurn already set from bid_made)
+        maybeAct();
       });
 
       socket.on('dummy_revealed', (_payload: DummyRevealedPayload) => {
@@ -236,7 +245,6 @@ describe('socket integration', () => {
 
       socket.on('hand_complete', (payload: HandCompletePayload) => {
         resolveHandComplete(payload);
-        socket.disconnect();
       });
 
       socket.on('invalid_bid', (payload) => {

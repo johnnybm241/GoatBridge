@@ -75,6 +75,7 @@ export interface ShareConventionCardPayload {
 }
 
 export interface ClientToServerEvents {
+  create_room: () => void;
   join_room: (payload: JoinRoomPayload) => void;
   leave_room: (payload: LeaveRoomPayload) => void;
   add_bot: (payload: AddBotPayload) => void;

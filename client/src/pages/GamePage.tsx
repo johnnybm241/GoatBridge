@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useGameState } from '../hooks/useGameState.js';
 import { useSocketEvents } from '../hooks/useSocket.js';
 import { useAuthStore } from '../store/authStore.js';
-import { getSocket } from '../socket.js';
+import { useGameStore } from '../store/gameStore.js';
+import { getSocket, initSocket } from '../socket.js';
 import BridgeTable from '../components/game/BridgeTable.js';
 import RoomChat from '../components/chat/RoomChat.js';
 import HostAdminPanel from '../components/admin/HostAdminPanel.js';
@@ -36,7 +37,28 @@ export default function GamePage() {
   useSocketEvents();
 
   useEffect(() => {
-    if (!roomCode || !auth.token) navigate('/');
+    if (!roomCode || !auth.token) { navigate('/'); return; }
+
+    // Ensure socket exists and is connected
+    let socket: ReturnType<typeof getSocket>;
+    try {
+      socket = getSocket();
+      if (!socket.connected) socket.connect();
+    } catch {
+      socket = initSocket(auth.token);
+    }
+
+    // If store doesn't have this room yet (direct URL nav / page refresh / rejoin),
+    // emit join_room so the server re-sends room state
+    const { roomCode: storeRoom, setRoom, setRoomLobby } = useGameStore.getState();
+    if (storeRoom !== roomCode) {
+      socket.once('room_joined', (payload) => {
+        setRoom(payload.roomCode, payload.hostUserId, payload.isSpectator);
+        setRoomLobby(payload.seats, payload.kibitzingAllowed, payload.spectators);
+      });
+      socket.once('room_error', () => navigate('/'));
+      socket.emit('join_room', { roomCode });
+    }
   }, [roomCode, auth.token]);
 
   const handleBid = (call: BidCall) => {
