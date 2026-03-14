@@ -9,10 +9,16 @@ import type { BidCall } from '@goatbridge/shared';
 import type { Card } from '@goatbridge/shared';
 import type { GameRoom } from '../game/stateMachine.js';
 
+// In development allow any localhost port (Vite may pick 5174, 5175, etc.)
+// In production restrict to the explicit CLIENT_ORIGIN
+const corsOrigin = config.nodeEnv === 'production'
+  ? config.clientOrigin
+  : /^http:\/\/localhost(:\d+)?$/;
+
 export function createSocketServer(httpServer: HttpServer): Server {
   const io = new Server(httpServer, {
     cors: {
-      origin: config.clientOrigin,
+      origin: corsOrigin,
       credentials: true,
     },
   });

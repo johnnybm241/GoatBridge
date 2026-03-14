@@ -72,7 +72,7 @@ export function setupGameHandlers(
 
     if (result.type === 'dummy_revealed') {
       emitToRoom(io, payload.roomCode, 'card_played', {
-        seat: room.game!.dummy!,
+        seat,  // the opening lead player, not dummy
         card: payload.card,
         currentTrick: result.game.currentTrick!,
         currentTurn: result.game.currentTurn,

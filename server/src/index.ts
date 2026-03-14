@@ -17,7 +17,10 @@ runMigrations();
 const app = express();
 const httpServer = createServer(app);
 
-app.use(cors({ origin: config.clientOrigin, credentials: true }));
+const corsOrigin = config.nodeEnv === 'production'
+  ? config.clientOrigin
+  : /^http:\/\/localhost(:\d+)?$/;
+app.use(cors({ origin: corsOrigin, credentials: true }));
 app.use(express.json());
 
 // REST routes
