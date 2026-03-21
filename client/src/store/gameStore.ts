@@ -15,6 +15,10 @@ interface GameStoreState {
   lastHandResult: { contract: Contract; declarer: Seat; tricksMade: number; contractMade: boolean } | null;
   messages: ChatMessage[];
   goatToast: { amount: number; id: number } | null;
+  bleatsToast: { amount: number; reason: string; id: number } | null;
+  claimFromSeat: Seat | null; // pending claim waiting for our response
+  undoFromSeat: Seat | null;  // pending undo waiting for our response
+  invalidCardMessage: string | null; // brief error shown when a card play is rejected
 
   setRoom: (roomCode: string, hostUserId: string, isSpectator: boolean) => void;
   setYourSeat: (seat: Seat) => void;
@@ -28,6 +32,11 @@ interface GameStoreState {
   removeCardFromHand: (card: Card) => void;
   showGoatToast: (amount: number) => void;
   clearGoatToast: () => void;
+  showBleatsToast: (amount: number, reason: string) => void;
+  clearBleatsToast: () => void;
+  setClaimFromSeat: (seat: Seat | null) => void;
+  setUndoFromSeat: (seat: Seat | null) => void;
+  setInvalidCardMessage: (msg: string | null) => void;
   reset: () => void;
 }
 
@@ -51,6 +60,10 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   lastHandResult: null,
   messages: [],
   goatToast: null,
+  bleatsToast: null,
+  claimFromSeat: null,
+  undoFromSeat: null,
+  invalidCardMessage: null,
 
   setRoom: (roomCode, hostUserId, isSpectator) => set({ roomCode, hostUserId, isSpectator }),
   setYourSeat: (seat) => set({ yourSeat: seat }),
@@ -71,6 +84,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     })),
   showGoatToast: (amount) => set({ goatToast: { amount, id: Date.now() } }),
   clearGoatToast: () => set({ goatToast: null }),
+  showBleatsToast: (amount, reason) => set({ bleatsToast: { amount, reason, id: Date.now() } }),
+  clearBleatsToast: () => set({ bleatsToast: null }),
+  setClaimFromSeat: (seat) => set({ claimFromSeat: seat }),
+  setUndoFromSeat: (seat) => set({ undoFromSeat: seat }),
+  setInvalidCardMessage: (msg) => set({ invalidCardMessage: msg }),
   reset: () => set({
     roomCode: null,
     isSpectator: false,
@@ -83,5 +101,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     roomSpectators: [],
     lastHandResult: null,
     messages: [],
+    goatToast: null,
+    bleatsToast: null,
+    claimFromSeat: null,
+    undoFromSeat: null,
   }),
 }));

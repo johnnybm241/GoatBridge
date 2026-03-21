@@ -14,6 +14,11 @@ interface UserRow {
   password_hash: string;
   active_card_back_skin: string;
   goat_balance: number;
+  hands_played: number;
+  skill_points: number;
+  bleats: number;
+  is_admin: number;
+  can_create_tournament: number;
 }
 
 router.post('/register', async (req, res) => {
@@ -79,7 +84,13 @@ router.post('/login', async (req, res) => {
   sqlite.run('UPDATE users SET last_login_at = ? WHERE id = ?', [Date.now(), user.id]);
 
   const token = signToken({ userId: user.id, username: user.username });
-  res.json({ token, userId: user.id, username: user.username });
+  res.json({
+    token,
+    userId: user.id,
+    username: user.username,
+    isAdmin: !!user.is_admin,
+    canCreateTournament: !!user.can_create_tournament,
+  });
 });
 
 router.get('/me', requireAuth, (req: AuthRequest, res) => {
@@ -94,6 +105,11 @@ router.get('/me', requireAuth, (req: AuthRequest, res) => {
     email: user.email,
     activeCardBackSkin: user.active_card_back_skin,
     goatBalance: user.goat_balance,
+    handsPlayed: user.hands_played ?? 0,
+    skillPoints: user.skill_points ?? 0,
+    bleats: user.bleats ?? 0,
+    isAdmin: !!user.is_admin,
+    canCreateTournament: !!user.can_create_tournament,
   });
 });
 

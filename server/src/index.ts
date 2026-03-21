@@ -10,6 +10,9 @@ import skinRoutes from './skins/routes.js';
 import conventionRoutes from './conventions/routes.js';
 import partnershipRoutes from './partnerships/routes.js';
 import roomRoutes from './rooms/routes.js';
+import teamMatchRoutes from './teamMatches/routes.js';
+import adminRoutes from './admin/routes.js';
+import tournamentRoutes from './tournaments/routes.js';
 
 // Run DB migrations on startup
 runMigrations();
@@ -30,6 +33,9 @@ app.use('/skins', skinRoutes);
 app.use('/conventions', conventionRoutes);
 app.use('/partnerships', partnershipRoutes);
 app.use('/rooms', roomRoutes);
+app.use('/team-matches', teamMatchRoutes);
+app.use('/admin', adminRoutes);
+app.use('/tournaments', tournamentRoutes);
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore.js';
 import { initSocket } from '../socket.js';
+import api from '../api.js';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -11,6 +12,10 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const setAuth = useAuthStore(s => s.setAuth);
+  const setSkillPoints = useAuthStore(s => s.setSkillPoints);
+  const setHandsPlayed = useAuthStore(s => s.setHandsPlayed);
+  const setIsAdmin = useAuthStore(s => s.setIsAdmin);
+  const setCanCreateTournament = useAuthStore(s => s.setCanCreateTournament);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,6 +26,15 @@ export default function LoginPage() {
       const { token, userId } = res.data as { token: string; userId: string; username: string };
       setAuth(token, userId, username);
       initSocket(token);
+      // Load profile data on login
+      api.get<{ skillPoints: number; handsPlayed: number; isAdmin: boolean; canCreateTournament: boolean }>('/auth/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      }).then(me => {
+        setSkillPoints(me.data.skillPoints);
+        setHandsPlayed(me.data.handsPlayed);
+        setIsAdmin(me.data.isAdmin ?? false);
+        setCanCreateTournament(me.data.canCreateTournament ?? false);
+      }).catch(() => {});
       navigate('/');
     } catch (err: unknown) {
       setError((err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Login failed');

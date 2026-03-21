@@ -3,6 +3,8 @@ import type { BidCall, BiddingState } from '../types/bidding.js';
 import type { GameState, Seat, SeatInfo, SpectatorInfo, Trick } from '../types/game.js';
 import type { Contract, HandScore, RubberScore } from '../types/scoring.js';
 import type { ConventionCardData } from '../types/conventions.js';
+import type { TeamMatchState } from '../types/teamMatch.js';
+import type { TournamentState, PairEntry } from '../types/tournament.js';
 
 export interface RoomJoinedPayload {
   roomCode: string;
@@ -145,7 +147,79 @@ export interface ConventionCardsShownPayload {
   cardName: string;
 }
 
+export interface ClaimRequestedPayload {
+  fromSeat: Seat;
+}
+
+export interface ClaimResultPayload {
+  accepted: boolean;
+  gameState?: GameState; // sent when accepted (shows final state)
+}
+
+export interface BleatsAwardedPayload {
+  amount: number;    // bleats earned this hand
+  bleats: number;    // new running total
+  handsPlayed: number;
+  reason: string;    // e.g. "Hand played", "Contract made!", "Defenders win!", "Rubber won!"
+}
+
 export interface RoomErrorPayload {
+  message: string;
+}
+
+export interface TeamMatchStatePayload {
+  match: TeamMatchState;
+}
+
+export interface TeamMatchBoardResultPayload {
+  matchCode: string;
+  boardNumber: number;
+  t1NsSigned: number | null;
+  t2NsSigned: number | null;
+  impsTeam1: number | null;
+  totalImpsTeam1: number;
+  totalImpsTeam2: number;
+}
+
+export interface TeamMatchStartedPayload {
+  matchCode: string;
+  yourRoomCode: string;
+  table1RoomCode: string;
+  table2RoomCode: string;
+}
+
+export interface TeamMatchCompletePayload {
+  matchCode: string;
+  team1Imps: number;
+  team2Imps: number;
+  team1Name: string;
+  team2Name: string;
+  winner: 'team1' | 'team2' | 'tie';
+}
+
+export interface TournamentStatePayload {
+  tournament: TournamentState;
+  pairEntries?: PairEntry[];
+}
+
+export interface TournamentCompletePayload {
+  tournamentCode: string;
+}
+
+export interface PairsTableStartedPayload {
+  tournamentCode: string;
+  yourRoomCode: string;
+  roundNumber: number;
+  boardStart: number;
+  boardEnd: number;
+}
+
+export interface HandSwappedPayload {
+  yourHand: Card[];
+  gameState: GameState;
+}
+
+export interface TournamentErrorPayload {
   message: string;
 }
 
@@ -181,4 +255,19 @@ export interface ServerToClientEvents {
   kibitzing_changed: (payload: KibitzingChangedPayload) => void;
   kicked: () => void;
   convention_cards_shown: (payload: ConventionCardsShownPayload) => void;
+  claim_requested: (payload: ClaimRequestedPayload) => void;
+  claim_result: (payload: ClaimResultPayload) => void;
+  bleats_awarded: (payload: BleatsAwardedPayload) => void;
+  team_match_state: (payload: TeamMatchStatePayload) => void;
+  team_match_updated: (payload: TeamMatchStatePayload) => void;
+  team_match_started: (payload: TeamMatchStartedPayload) => void;
+  team_match_board_result: (payload: TeamMatchBoardResultPayload) => void;
+  team_match_complete: (payload: TeamMatchCompletePayload) => void;
+  tournament_state: (payload: TournamentStatePayload) => void;
+  tournament_updated: (payload: TournamentStatePayload) => void;
+  tournament_complete: (payload: TournamentCompletePayload) => void;
+  tournament_joined: (payload: TournamentStatePayload) => void;
+  pairs_table_started: (payload: PairsTableStartedPayload) => void;
+  hand_swapped: (payload: HandSwappedPayload) => void;
+  tournament_error: (payload: TournamentErrorPayload) => void;
 }

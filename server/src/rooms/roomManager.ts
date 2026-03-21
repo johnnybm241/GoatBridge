@@ -47,7 +47,7 @@ export function createRoom(hostUserId: string): GameRoom {
     spectators: [],
     game: null,
     hands: { north: [], east: [], south: [], west: [] },
-    previousState: null,
+    undoStack: [],
   };
 
   rooms.set(code, room);
@@ -76,10 +76,12 @@ export function joinSeat(
   skin: string,
   seat?: Seat,
 ): { seat: Seat } | { error: string } {
-  // Check already seated
+  // Check already seated (including reconnect after disconnect)
   const existingSeat = findSeatByUserId(room, userId);
   if (existingSeat) {
     room.seats[existingSeat].isConnected = true;
+    room.seats[existingSeat].disconnected = false;
+    room.seats[existingSeat].disconnectedAt = null;
     return { seat: existingSeat };
   }
 

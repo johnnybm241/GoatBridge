@@ -9,6 +9,11 @@ import ShopPage from './pages/ShopPage.js';
 import ConventionsPage from './pages/ConventionsPage.js';
 import ConventionEditorPage from './pages/ConventionEditorPage.js';
 import PartnershipsPage from './pages/PartnershipsPage.js';
+import TeamMatchPage from './pages/TeamMatchPage.js';
+import TeamMatchLobbyPage from './pages/TeamMatchLobbyPage.js';
+import AdminPage from './pages/AdminPage.js';
+import TournamentPage from './pages/TournamentPage.js';
+import TournamentLobbyPage from './pages/TournamentLobbyPage.js';
 import NavBar from './components/NavBar.js';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -21,7 +26,9 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <div className="flex flex-col h-screen">
       {token && <NavBar />}
+      <div className="flex-1 overflow-auto min-h-0">
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
@@ -32,8 +39,15 @@ export default function App() {
         <Route path="/conventions" element={<PrivateRoute><ConventionsPage /></PrivateRoute>} />
         <Route path="/conventions/:id" element={<PrivateRoute><ConventionEditorPage /></PrivateRoute>} />
         <Route path="/partnerships" element={<PrivateRoute><PartnershipsPage /></PrivateRoute>} />
+        <Route path="/team-matches" element={<PrivateRoute><TeamMatchPage /></PrivateRoute>} />
+        <Route path="/team-matches/:matchCode" element={<PrivateRoute><TeamMatchLobbyPage /></PrivateRoute>} />
+        <Route path="/admin" element={<PrivateRoute><AdminPage /></PrivateRoute>} />
+        <Route path="/tournaments" element={<PrivateRoute><TournamentPage /></PrivateRoute>} />
+        <Route path="/tournaments/:tournamentCode" element={<PrivateRoute><TournamentLobbyPage /></PrivateRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </div>
+      </div>
     </BrowserRouter>
   );
 }

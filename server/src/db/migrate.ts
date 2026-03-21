@@ -103,22 +103,89 @@ export function runMigrations() {
     );
   `);
 
-  // Seed default skins
+  // Add new columns (safe: wrapped in try/catch since SQLite has no ADD COLUMN IF NOT EXISTS)
+  try { sqlite.exec('ALTER TABLE users ADD COLUMN hands_played INTEGER NOT NULL DEFAULT 0'); } catch { /* already exists */ }
+  try { sqlite.exec('ALTER TABLE users ADD COLUMN chips_balance INTEGER NOT NULL DEFAULT 0'); } catch { /* already exists */ }
+  try { sqlite.exec('ALTER TABLE users ADD COLUMN skill_points INTEGER NOT NULL DEFAULT 0'); } catch { /* already exists */ }
+  try { sqlite.exec('ALTER TABLE users ADD COLUMN bleats INTEGER NOT NULL DEFAULT 0'); } catch { /* already exists */ }
+  try { sqlite.exec('ALTER TABLE skins ADD COLUMN chip_cost INTEGER'); } catch { /* already exists */ }
+
+  // Seed / patch skins — all skins use goat currency only (no chips)
   const existing = sqlite.get<{ id: string }>('SELECT id FROM skins WHERE slug = ?', ['classic']);
   if (!existing) {
     const skinsData = [
-      { id: uuidv4(), name: 'Classic', slug: 'classic', description: 'Navy blue geometric pattern', previewUrl: '/skins/classic.svg', unlockType: 'default', unlockThreshold: null, goatCost: null },
-      { id: uuidv4(), name: 'Ocean', slug: 'ocean', description: 'Deep ocean waves', previewUrl: '/skins/ocean.svg', unlockType: 'progress', unlockThreshold: 10, goatCost: null },
-      { id: uuidv4(), name: 'Midnight', slug: 'midnight', description: 'Starry night sky', previewUrl: '/skins/midnight.svg', unlockType: 'progress', unlockThreshold: 50, goatCost: null },
-      { id: uuidv4(), name: 'Gold Foil', slug: 'gold-foil', description: 'Premium gold foil pattern', previewUrl: '/skins/gold-foil.svg', unlockType: 'purchase', unlockThreshold: null, goatCost: 500 },
+      { id: uuidv4(), name: 'Classic',   slug: 'classic',   description: 'Navy blue geometric pattern', previewUrl: '/skins/classic.svg',   unlockType: 'default',  goatCost: null },
+      { id: uuidv4(), name: 'Ocean',     slug: 'ocean',     description: 'Deep ocean waves',             previewUrl: '/skins/ocean.svg',     unlockType: 'purchase', goatCost: 100  },
+      { id: uuidv4(), name: 'Midnight',  slug: 'midnight',  description: 'Starry night sky',             previewUrl: '/skins/midnight.svg',  unlockType: 'purchase', goatCost: 200  },
+      { id: uuidv4(), name: 'Gold Foil', slug: 'gold-foil', description: 'Premium gold foil pattern',    previewUrl: '/skins/gold-foil.svg', unlockType: 'purchase', goatCost: 500  },
+      { id: uuidv4(), name: 'Crimson',   slug: 'crimson',   description: 'Deep red luxury felt',         previewUrl: '/skins/crimson.svg',   unlockType: 'purchase', goatCost: 200  },
+      { id: uuidv4(), name: 'Forest',    slug: 'forest',    description: 'Rich forest green pattern',    previewUrl: '/skins/forest.svg',    unlockType: 'purchase', goatCost: 300  },
     ];
     for (const s of skinsData) {
       sqlite.run(
-        'INSERT INTO skins (id, name, slug, description, preview_url, unlock_type, unlock_threshold, goat_cost) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [s.id, s.name, s.slug, s.description, s.previewUrl, s.unlockType, s.unlockThreshold, s.goatCost],
+        'INSERT INTO skins (id, name, slug, description, preview_url, unlock_type, unlock_threshold, goat_cost, chip_cost) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [s.id, s.name, s.slug, s.description, s.previewUrl, s.unlockType, null, s.goatCost, null],
       );
     }
+  } else {
+    // Patch all skins to goat-only currency
+    const patches: { slug: string; unlockType: string; goatCost: number | null }[] = [
+      { slug: 'classic',   unlockType: 'default',  goatCost: null },
+      { slug: 'ocean',     unlockType: 'purchase', goatCost: 100  },
+      { slug: 'midnight',  unlockType: 'purchase', goatCost: 200  },
+      { slug: 'gold-foil', unlockType: 'purchase', goatCost: 500  },
+      { slug: 'crimson',   unlockType: 'purchase', goatCost: 200  },
+      { slug: 'forest',    unlockType: 'purchase', goatCost: 300  },
+    ];
+    for (const p of patches) {
+      const ex = sqlite.get('SELECT id FROM skins WHERE slug = ?', [p.slug]);
+      if (ex) {
+        sqlite.run(
+          'UPDATE skins SET unlock_type = ?, unlock_threshold = ?, goat_cost = ?, chip_cost = NULL WHERE slug = ?',
+          [p.unlockType, null, p.goatCost, p.slug],
+        );
+      } else {
+        const id = uuidv4();
+        const names: Record<string, string> = { 'gold-foil': 'Gold Foil', crimson: 'Crimson', forest: 'Forest', ocean: 'Ocean', midnight: 'Midnight', classic: 'Classic' };
+        sqlite.run(
+          'INSERT INTO skins (id, name, slug, description, preview_url, unlock_type, unlock_threshold, goat_cost, chip_cost) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [id, names[p.slug] ?? p.slug, p.slug, '', `/skins/${p.slug}.svg`, p.unlockType, null, p.goatCost, null],
+        );
+      }
+    }
   }
+
+  try { sqlite.exec(`CREATE TABLE IF NOT EXISTS team_matches (
+    id TEXT PRIMARY KEY,
+    match_code TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    host_user_id TEXT NOT NULL REFERENCES users(id),
+    board_count INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'lobby',
+    team1_name TEXT NOT NULL DEFAULT 'Team 1',
+    team2_name TEXT NOT NULL DEFAULT 'Team 2',
+    team1_imps INTEGER NOT NULL DEFAULT 0,
+    team2_imps INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    completed_at INTEGER
+  )`); } catch { /* already exists */ }
+
+  try { sqlite.exec('ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0'); } catch { /* already exists */ }
+  try { sqlite.exec('ALTER TABLE users ADD COLUMN can_create_tournament INTEGER NOT NULL DEFAULT 0'); } catch { /* already exists */ }
+
+  try { sqlite.exec(`CREATE TABLE IF NOT EXISTS tournaments (
+    id TEXT PRIMARY KEY,
+    tournament_code TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    organizer_user_id TEXT NOT NULL REFERENCES users(id),
+    board_count INTEGER NOT NULL DEFAULT 8,
+    status TEXT NOT NULL DEFAULT 'setup',
+    created_at INTEGER NOT NULL,
+    completed_at INTEGER
+  )`); } catch { /* already exists */ }
+
+  // Seed admin user
+  try { sqlite.run('UPDATE users SET is_admin = 1, can_create_tournament = 1 WHERE username = ?', ['Johnnybm']); } catch { /* non-fatal */ }
 
   console.log('Database migrations complete.');
 }

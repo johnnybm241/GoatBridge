@@ -5,6 +5,8 @@ import { useAuthStore } from '../store/authStore.js';
 import { useGameStore } from '../store/gameStore.js';
 import { APP_VERSION } from '../version.js';
 import api from '../api.js';
+import type { Seat } from '@goatbridge/shared';
+import { SEATS } from '@goatbridge/shared';
 
 interface ActiveRoom {
   roomCode: string;
@@ -53,6 +55,10 @@ export default function LobbyPage() {
     // Listen for room_joined before emitting so we never miss it
     socket.once('room_joined', (payload) => {
       gameStore.setRoom(payload.roomCode, payload.hostUserId, payload.isSpectator);
+      gameStore.setRoomLobby(payload.seats, payload.kibitzingAllowed, payload.spectators);
+      for (const s of SEATS) {
+        if (payload.seats[s]?.userId === auth.userId) { gameStore.setYourSeat(s); break; }
+      }
       navigate(`/game/${payload.roomCode}`);
     });
     socket.once('room_error', (payload) => {
@@ -74,6 +80,10 @@ export default function LobbyPage() {
 
     socket.once('room_joined', (payload) => {
       gameStore.setRoom(payload.roomCode, payload.hostUserId, payload.isSpectator);
+      gameStore.setRoomLobby(payload.seats, payload.kibitzingAllowed, payload.spectators);
+      for (const s of SEATS) {
+        if (payload.seats[s]?.userId === auth.userId) { gameStore.setYourSeat(s); break; }
+      }
       navigate(`/game/${payload.roomCode}`);
     });
     socket.once('room_error', (payload) => {

@@ -74,6 +74,72 @@ export interface ShareConventionCardPayload {
   conventionCardId: string;
 }
 
+export interface RequestClaimPayload {
+  roomCode: string;
+}
+
+export interface RespondClaimPayload {
+  roomCode: string;
+  accept: boolean;
+}
+
+export interface CreateTeamMatchPayload {
+  name: string;
+  boardCount: 4 | 8 | 12 | 16;
+}
+
+export interface JoinTeamMatchPayload {
+  matchCode: string;
+}
+
+export interface JoinTeamPayload {
+  matchCode: string;
+  team: 1 | 2;
+}
+
+export interface LeaveTeamMatchPayload {
+  matchCode: string;
+}
+
+export interface StartTeamMatchPayload {
+  matchCode: string;
+}
+
+export interface CreateTournamentPayload {
+  name: string;
+  totalBoards: number;
+  boardsPerRound: number;
+}
+
+export interface JoinTournamentPayload {
+  tournamentCode: string;
+}
+
+export interface JoinTournamentLobbyPayload {
+  tournamentCode: string;
+}
+
+export interface LeaveTournamentLobbyPayload {
+  tournamentCode: string;
+}
+
+export interface StartTournamentPayload {
+  tournamentCode: string;
+}
+
+export interface AddPairEntryPayload {
+  tournamentCode: string;
+  player1UserId: string;
+  player1DisplayName: string;
+  player2UserId?: string;
+  player2DisplayName?: string;
+}
+
+export interface RemovePairEntryPayload {
+  tournamentCode: string;
+  pairId: string;
+}
+
 export interface ClientToServerEvents {
   create_room: () => void;
   join_room: (payload: JoinRoomPayload) => void;
@@ -91,4 +157,18 @@ export interface ClientToServerEvents {
   approve_player_return: (payload: ApprovePlayerReturnPayload) => void;
   deny_player_return: (payload: DenyPlayerReturnPayload) => void;
   share_convention_card: (payload: ShareConventionCardPayload) => void;
+  request_claim: (payload: RequestClaimPayload) => void;
+  respond_claim: (payload: RespondClaimPayload) => void;
+  create_team_match: (payload: CreateTeamMatchPayload) => void;
+  join_team_match: (payload: JoinTeamMatchPayload) => void;
+  join_team: (payload: JoinTeamPayload) => void;
+  leave_team_match: (payload: LeaveTeamMatchPayload) => void;
+  start_team_match: (payload: StartTeamMatchPayload) => void;
+  create_tournament: (payload: CreateTournamentPayload) => void;
+  join_tournament_lobby: (payload: JoinTournamentLobbyPayload) => void;
+  leave_tournament_lobby: (payload: LeaveTournamentLobbyPayload) => void;
+  start_tournament: (payload: StartTournamentPayload) => void;
+  join_tournament: (payload: JoinTournamentPayload) => void;
+  add_pair_entry: (payload: AddPairEntryPayload) => void;
+  remove_pair_entry: (payload: RemovePairEntryPayload) => void;
 }

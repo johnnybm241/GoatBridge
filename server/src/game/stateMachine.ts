@@ -1,6 +1,7 @@
 import type { GameState, Seat, Trick } from '@goatbridge/shared';
 import { SEATS } from '@goatbridge/shared';
-import type { Card } from '@goatbridge/shared';
+import type { Card, Suit } from '@goatbridge/shared';
+import { RANK_ORDER } from '@goatbridge/shared';
 import type { BidCall } from '@goatbridge/shared';
 import { deal } from './deck.js';
 import {
@@ -33,17 +34,24 @@ export interface GameRoom {
   spectators: Array<{ userId: string; displayName: string }>;
   game: GameState | null;
   hands: Record<Seat, Card[]>; // server-only, not broadcast
-  previousState: { game: GameState; hands: Record<Seat, Card[]> } | null; // for undo
+  undoStack: Array<{ game: GameState; hands: Record<Seat, Card[]> }>; // for undo
+  teamMatchCode?: string | null;   // set when this room is part of a team match
+  matchBoardCount?: number | null; // total boards in the team match
+  // Swiss pairs tournament fields
+  pairsTournamentCode?: string | null;
+  pairsRoundNumber?: number | null;
+  pairsTableIndex?: number | null;
+  pairsBoardCount?: number | null;    // boards to play in this round
+  pairsBoardStart?: number | null;    // 1-indexed tournament board number for first board
+  pairsNsPairId?: string | null;
+  pairsEwPairId?: string | null;
+  pairsPreDealtBoards?: Array<Record<Seat, Card[]>> | null;
 }
 
 export function initGameState(room: GameRoom, dealer: Seat): GameState {
   const scores = room.game?.scores ?? createInitialRubberScore();
   const handNumber = (room.game?.handNumber ?? 0) + 1;
-  const vulnerability = getNextVulnerability(
-    room.game?.vulnerability ?? 'none',
-    scores.nsGamesWon,
-    scores.ewGamesWon,
-  );
+  const vulnerability = getNextVulnerability(handNumber);
 
   return {
     phase: 'bidding',
@@ -66,6 +74,7 @@ export function initGameState(room: GameRoom, dealer: Seat): GameState {
     handNumber,
     pendingUndoFrom: null,
     undoApprovals: { north: null, east: null, south: null, west: null },
+    pendingClaim: null,
   };
 }
 
@@ -83,8 +92,10 @@ export function processBid(room: GameRoom, seat: Seat, call: BidCall): BidResult
   const validation = validateCall(call, game.bidding, seatIdx);
   if (!validation.valid) return { type: 'invalid', error: validation.error! };
 
-  // Save undo snapshot
-  room.previousState = { game: { ...game }, hands: { ...room.hands } };
+  // Only save undo snapshot for human bids
+  if (!game.seats[seat].isAI) {
+    room.undoStack.push({ game: { ...game }, hands: { ...room.hands } });
+  }
 
   const newBidding = applyCall(game.bidding, seat, call);
   const nextTurn = nextSeat(seat);
@@ -97,6 +108,7 @@ export function processBid(room: GameRoom, seat: Seat, call: BidCall): BidResult
 
   if (newBidding.isComplete) {
     if (newBidding.passedOut) {
+      room.game = newGame;   // keep game state consistent even on passout
       return { type: 'auction_complete', game: newGame, passedOut: true };
     }
     const { declarer, dummy } = determineDeclarer(newBidding, newBidding.currentBid!);
@@ -146,14 +158,24 @@ export function processCardPlay(room: GameRoom, seat: Seat, card: Card): CardPla
   const validation = isValidPlay(card, hand, game.currentTrick);
   if (!validation.valid) return { type: 'invalid', error: validation.error! };
 
-  // Save undo snapshot
-  room.previousState = {
-    game: JSON.parse(JSON.stringify(game)) as GameState,
-    hands: JSON.parse(JSON.stringify(room.hands)) as Record<Seat, Card[]>,
-  };
+  // Only save undo snapshot for human plays so that undo reverts the human's last action,
+  // not a subsequent bot action that overwrote the snapshot.
+  if (!game.seats[seat].isAI) {
+    room.undoStack.push({
+      game: JSON.parse(JSON.stringify(game)) as GameState,
+      hands: JSON.parse(JSON.stringify(room.hands)) as Record<Seat, Card[]>,
+    });
+  }
 
   // Remove card from hand
   room.hands[effectiveSeat] = removeCardFromHand(hand, card);
+
+  // Keep game.dummyHand in sync with room.hands[dummy] so undo snapshots are accurate.
+  // Without this, the snapshot always contains the full original dummy hand, causing
+  // ghost cards to appear after an undo (previously played dummy cards shown as still present).
+  const updatedDummyHand = (effectiveSeat === game.dummy && game.dummyHand)
+    ? removeCardFromHand(game.dummyHand, card)
+    : game.dummyHand;
 
   const trickCard = { seat: effectiveSeat, card };
   let currentTrick: Trick;
@@ -184,6 +206,7 @@ export function processCardPlay(room: GameRoom, seat: Seat, card: Card): CardPla
     const newGame: GameState = {
       ...game,
       currentTrick,
+      dummyHand: updatedDummyHand,
       currentTurn: nextPlayer,
     };
     room.game = newGame;
@@ -218,6 +241,7 @@ export function processCardPlay(room: GameRoom, seat: Seat, card: Card): CardPla
       currentTrick: null,
       currentTurn: null,
       scores: newScores,
+      dummyHand: updatedDummyHand,
     };
     room.game = newGame;
     return { type: 'hand_complete', game: newGame, tricksMade, contract: game.contract! };
@@ -230,19 +254,85 @@ export function processCardPlay(room: GameRoom, seat: Seat, card: Card): CardPla
     completedTricks,
     trickCounts: newTrickCounts,
     currentTurn: winner,
+    dummyHand: updatedDummyHand,
   };
   room.game = newGame;
   return { type: 'trick_complete', game: newGame, winner, trick: completedTrick };
 }
 
-export function startNewHand(room: GameRoom): { game: GameState; hands: Record<Seat, Card[]> } {
-  const seats = SEATS;
-  const currentDealer = room.game?.dealer;
-  const dealerIdx = currentDealer ? seats.indexOf(currentDealer) : 0;
-  const nextDealer = seats[(dealerIdx + 1) % 4]!;
+/**
+ * Returns true if the declarer side is guaranteed to win all remaining tricks.
+ * Conservative: validates top-card ownership or void+trump for each suit opponents hold.
+ */
+export function validateClaimAllTricks(room: GameRoom): boolean {
+  const game = room.game!;
+  if (!game.contract || !game.declarer || !game.dummy) return false;
 
-  const newHands = deal();
+  const trump = getTrumpSuit(game.contract.strain) as Suit | null;
+  const declarerSide: Seat[] = [game.declarer, game.dummy];
+  const oppSide = SEATS.filter(s => !declarerSide.includes(s));
+
+  const myCards = declarerSide.flatMap(s => room.hands[s] ?? []);
+  const oppCards = oppSide.flatMap(s => room.hands[s] ?? []);
+
+  if (oppCards.length === 0) return true; // no tricks left to lose
+
+  const rankVal = (r: string) => RANK_ORDER.indexOf(r);
+  const myTrumps = trump ? myCards.filter(c => c.suit === trump) : [];
+
+  for (const suit of ['spades', 'hearts', 'diamonds', 'clubs'] as Suit[]) {
+    const oppInSuit = oppCards.filter(c => c.suit === suit);
+    if (oppInSuit.length === 0) continue;
+
+    const myInSuit = myCards.filter(c => c.suit === suit);
+    if (myInSuit.length === 0) {
+      // Void — can ruff only if we have trump and it's not a NT contract
+      if (!trump || myTrumps.length === 0) return false;
+      continue;
+    }
+
+    // We have cards in this suit — we must hold the highest
+    const maxOpp = Math.max(...oppInSuit.map(c => rankVal(c.rank)));
+    const maxMine = Math.max(...myInSuit.map(c => rankVal(c.rank)));
+    if (maxMine <= maxOpp) return false;
+  }
+  return true;
+}
+
+/** Settle a claim: award all remaining tricks to declarer side and resolve the hand. */
+export function settleClaim(room: GameRoom): { type: 'hand_complete'; game: GameState; tricksMade: number; contract: Contract } {
+  const game = room.game!;
+  const declarerSide: 'ns' | 'ew' = (game.declarer === 'north' || game.declarer === 'south') ? 'ns' : 'ew';
+  const remaining = room.hands[game.declarer!]?.length ?? 0;
+  const newTrickCounts = {
+    ns: game.trickCounts.ns + (declarerSide === 'ns' ? remaining : 0),
+    ew: game.trickCounts.ew + (declarerSide === 'ew' ? remaining : 0),
+  };
+  const tricksMade = newTrickCounts[declarerSide];
+  const handScore = scoreHand(game.contract!, tricksMade, game.vulnerability, declarerSide);
+  const newScores = updateRubberScore(game.scores, handScore);
+
+  const newGame: GameState = {
+    ...game,
+    phase: newScores.isComplete ? 'complete' : 'scoring',
+    trickCounts: newTrickCounts,
+    currentTrick: null,
+    currentTurn: null,
+    scores: newScores,
+    pendingClaim: null,
+  };
+  room.game = newGame;
+  return { type: 'hand_complete', game: newGame, tricksMade, contract: game.contract! };
+}
+
+export function startNewHand(room: GameRoom, preDealt?: Record<Seat, Card[]>): { game: GameState; hands: Record<Seat, Card[]> } {
+  // Dealer cycles N→E→S→W based on hand number (1-indexed)
+  const nextHandNumber = (room.game?.handNumber ?? 0) + 1;
+  const nextDealer = SEATS[(nextHandNumber - 1) % 4]!;
+
+  const newHands = preDealt ?? deal();
   room.hands = newHands;
+  room.undoStack = []; // clear undo history between hands
 
   const newGame = initGameState(room, nextDealer);
   room.game = newGame;
