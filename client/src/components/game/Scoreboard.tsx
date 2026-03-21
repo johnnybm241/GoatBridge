@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { RubberScore, Vulnerability } from '@goatbridge/shared';
 
 interface ScoreboardProps {
@@ -6,11 +7,33 @@ interface ScoreboardProps {
 }
 
 export default function Scoreboard({ scores, vulnerability }: ScoreboardProps) {
+  const [expanded, setExpanded] = useState(false);
   const nsVul = vulnerability === 'ns' || vulnerability === 'both';
   const ewVul = vulnerability === 'ew' || vulnerability === 'both';
 
+  const nsLabel = `${nsVul ? '♦ ' : ''}NS ${scores.nsBelowPartial || scores.nsGamesWon ? `${scores.nsBelowPartial > 0 ? scores.nsBelowPartial : ''}${'★'.repeat(scores.nsGamesWon)}` : '0'}`;
+  const ewLabel = `${ewVul ? '♦ ' : ''}EW ${scores.ewBelowPartial || scores.ewGamesWon ? `${scores.ewBelowPartial > 0 ? scores.ewBelowPartial : ''}${'★'.repeat(scores.ewGamesWon)}` : '0'}`;
+
+  if (!expanded) {
+    return (
+      <button
+        onClick={() => setExpanded(true)}
+        className="bg-cream/95 text-gray-900 rounded-lg px-2 py-1 shadow-lg border border-gray-300 font-serif text-xs font-bold flex items-center gap-1.5 hover:bg-cream transition-colors"
+      >
+        <span className={nsVul ? 'text-red-700' : 'text-navy'}>{nsLabel}</span>
+        <span className="text-gray-400">|</span>
+        <span className={ewVul ? 'text-red-700' : 'text-navy'}>{ewLabel}</span>
+      </button>
+    );
+  }
+
   return (
-    <div className="bg-cream text-gray-900 rounded-lg p-3 min-w-[180px] shadow-xl text-sm font-serif">
+    <div className="relative bg-cream text-gray-900 rounded-lg p-3 min-w-[180px] shadow-xl text-sm font-serif">
+      <button
+        onClick={() => setExpanded(false)}
+        className="absolute top-1 right-1.5 text-gray-400 hover:text-gray-800 font-bold text-sm leading-none"
+        aria-label="collapse"
+      >×</button>
       <div className="text-center font-bold text-navy border-b-2 border-gray-900 pb-1 mb-2">
         Bridge Score
       </div>

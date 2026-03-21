@@ -13,9 +13,15 @@ interface CardProps {
 }
 
 const SIZE_CLASSES = {
-  sm: 'w-10 h-14 text-xs',
-  md: 'w-14 h-20 text-sm',
-  lg: 'w-16 h-24 text-base',
+  sm: 'w-10 h-14 md:w-12 md:h-16 lg:w-14 lg:h-20 text-xs',
+  md: 'w-12 h-16 md:w-16 md:h-24 lg:w-20 lg:h-28 text-xs md:text-sm',
+  lg: 'w-14 h-20 sm:w-16 sm:h-24 md:w-20 md:h-28 lg:w-24 lg:h-32 xl:w-28 xl:h-40 text-xs sm:text-sm md:text-base lg:text-lg',
+};
+
+const CORNER_SUIT_SIZE = {
+  sm: 'text-xs',
+  md: 'text-xs md:text-sm',
+  lg: 'text-sm md:text-base lg:text-xl xl:text-2xl',
 };
 
 const SUIT_COLORS = {
@@ -27,6 +33,7 @@ const SUIT_COLORS = {
 
 export default function Card({ card, onClick, playable = false, size = 'md', faceDown = false, className = '' }: CardProps) {
   const sizeClass = SIZE_CLASSES[size];
+  const cornerSuitSize = CORNER_SUIT_SIZE[size];
   const suitColor = SUIT_COLORS[card.suit];
   const symbol = SUIT_SYMBOLS[card.suit];
 
@@ -54,13 +61,9 @@ export default function Card({ card, onClick, playable = false, size = 'md', fac
     >
       <div className={`${suitColor} font-bold leading-none text-left`}>
         <div>{card.rank}</div>
-        <div className="text-xs">{symbol}</div>
+        <div className={cornerSuitSize}>{symbol}</div>
       </div>
-      <div className={`${suitColor} text-center text-xl leading-none`}>{symbol}</div>
-      <div className={`${suitColor} font-bold leading-none text-right rotate-180`}>
-        <div>{card.rank}</div>
-        <div className="text-xs">{symbol}</div>
-      </div>
+      <div className={`${suitColor} text-center text-base md:text-xl leading-none`}>{symbol}</div>
     </motion.div>
   );
 }
