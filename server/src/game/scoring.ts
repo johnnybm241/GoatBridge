@@ -203,15 +203,16 @@ export function updateRubberScore(
   };
 }
 
-export function getNextVulnerability(
-  current: Vulnerability,
-  nsGamesWon: number,
-  ewGamesWon: number,
-): Vulnerability {
-  if (nsGamesWon === 1 && ewGamesWon === 0) return 'ns';
-  if (nsGamesWon === 0 && ewGamesWon === 1) return 'ew';
-  if (nsGamesWon === 1 && ewGamesWon === 1) return 'both';
-  return 'none';
+// Standard 16-board duplicate vulnerability cycle
+const VUL_CYCLE: Vulnerability[] = [
+  'none', 'ns',   'ew',  'both',  // boards 1–4
+  'ns',   'ew',   'both','none',  // boards 5–8
+  'ew',   'both', 'none','ns',    // boards 9–12
+  'both', 'none', 'ns',  'ew',    // boards 13–16
+];
+
+export function getNextVulnerability(handNumber: number): Vulnerability {
+  return VUL_CYCLE[(handNumber - 1) % 16]!;
 }
 
 export function createInitialRubberScore(): RubberScore {

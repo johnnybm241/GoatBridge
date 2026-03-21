@@ -57,6 +57,8 @@ export interface GameState {
   // Undo support
   pendingUndoFrom: Seat | null;
   undoApprovals: Record<Seat, boolean | null>;
+  // Claim support
+  pendingClaim: { fromSeat: Seat; approvals: Record<Seat, boolean | null> } | null;
 }
 
 export interface RoomState {

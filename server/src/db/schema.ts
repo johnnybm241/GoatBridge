@@ -8,6 +8,9 @@ export const users = sqliteTable('users', {
   activeCardBackSkin: text('active_card_back_skin').notNull().default('classic'),
   defaultConventionCardId: text('default_convention_card_id'),
   goatBalance: integer('goat_balance').notNull().default(0),
+  handsPlayed: integer('hands_played').notNull().default(0),
+  skillPoints: integer('skill_points').notNull().default(0),
+  bleats: integer('bleats').notNull().default(0),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   lastLoginAt: integer('last_login_at', { mode: 'timestamp_ms' }),
 });
@@ -31,7 +34,7 @@ export const skins = sqliteTable('skins', {
   previewUrl: text('preview_url').notNull().default(''),
   unlockType: text('unlock_type', { enum: ['default', 'progress', 'purchase'] }).notNull(),
   unlockThreshold: integer('unlock_threshold'), // hands played needed
-  goatCost: integer('goat_cost'), // only for purchase type
+  goatCost: integer('goat_cost'),
 });
 
 export const userSkins = sqliteTable('user_skins', {

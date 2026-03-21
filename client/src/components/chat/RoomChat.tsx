@@ -52,7 +52,7 @@ export default function RoomChat({ messages, roomCode }: RoomChatProps) {
         />
         <button
           type="submit"
-          className="text-gold text-xs px-2 py-1 hover:text-gold-light transition-colors"
+          className="shrink-0 text-gold text-xs px-2 py-1 hover:text-gold-light transition-colors"
         >
           Send
         </button>

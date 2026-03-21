@@ -3,6 +3,7 @@ import type { Card } from '@goatbridge/shared';
 import type { GameRoom } from '../game/stateMachine.js';
 import { chooseBid } from './bidding/saycBidder.js';
 import { selectDeclarerCard, selectDefenderCard } from './cardPlay/cardSelector.js';
+import { logger } from '../logger.js';
 
 export interface AIAction {
   type: 'bid' | 'play';
@@ -28,11 +29,20 @@ export function scheduleAIAction(
 
   setTimeout(() => {
     const currentGame = room.game;
-    if (!currentGame || currentGame.currentTurn !== seat) return;
+    if (!currentGame) return;
+
+    // AI declarer also plays dummy's cards when it's dummy's turn
+    const declarerPlayingDummy =
+      currentGame.phase === 'playing' &&
+      currentGame.currentTurn === currentGame.dummy &&
+      currentGame.declarer === seat;
+
+    if (currentGame.currentTurn !== seat && !declarerPlayingDummy) return;
 
     if (currentGame.phase === 'bidding') {
       const hand = room.hands[seat];
       const call = chooseBid(hand, seat, currentGame.bidding);
+      logger.debug('AI bid', { seat, call });
       onBid(seat, call);
     } else if (currentGame.phase === 'playing') {
       const hand = room.hands[seat];
@@ -42,22 +52,24 @@ export function scheduleAIAction(
 
       let card: Card;
       if (isDeclarer) {
-        // Declarer also plays dummy's cards
+        // Declarer plays their own cards or dummy's cards
         card = selectDeclarerCard(
           hand,
           room.hands[currentGame.dummy!] ?? [],
           currentGame.currentTrick,
           contract.strain,
-          false,
+          declarerPlayingDummy,
+          currentGame.completedTricks,
         );
       } else if (isDummy) {
-        // Dummy's cards are played by declarer — AI declarer plays them
+        // Dummy's cards are played by AI declarer — should not reach here in normal flow
         card = selectDeclarerCard(
           room.hands[currentGame.declarer!] ?? [],
           hand,
           currentGame.currentTrick,
           contract.strain,
           true,
+          currentGame.completedTricks,
         );
       } else {
         // Defender
@@ -68,8 +80,12 @@ export function scheduleAIAction(
           currentGame.currentTrick,
           contract.strain,
           isOpeningLead,
+          seat,
+          currentGame.declarer,
+          currentGame.dummy,
         );
       }
+      logger.debug('AI play', { seat, card });
       onPlay(seat, card);
     }
   }, delay());
@@ -84,8 +100,20 @@ export function scheduleAIActionIfNeeded(
   if (!game || !game.currentTurn) return;
 
   const seat = game.currentTurn;
-  const seatInfo = game.seats[seat];
-  if (seatInfo?.isAI) {
-    scheduleAIAction(room, seat, onBid, onPlay);
+
+  // When it's dummy's turn, the declarer plays — schedule the declarer (AI or not)
+  if (seat === game.dummy && game.declarer) {
+    const declarerInfo = game.seats[game.declarer];
+    if (declarerInfo?.isAI) {
+      // AI declarer plays dummy's cards
+      scheduleAIAction(room, game.declarer, onBid, onPlay);
+    }
+    // If declarer is human, they play dummy's cards — nothing to schedule
+    return;
   }
+
+  const seatInfo = game.seats[seat];
+  if (!seatInfo?.isAI) return;
+
+  scheduleAIAction(room, seat, onBid, onPlay);
 }

@@ -8,10 +8,17 @@ export function useGameState() {
   const isYourTurn = () => {
     const gs = store.gameState;
     if (!gs || !store.yourSeat) return false;
-    // Declarer plays dummy too
-    if (gs.phase === 'playing' && gs.currentTurn === gs.dummy && store.yourSeat === gs.declarer) {
-      return true;
+
+    if (gs.phase === 'playing' && gs.currentTurn === gs.dummy) {
+      // Declarer plays dummy's cards — but only if the declarer is the human user
+      if (store.yourSeat === gs.declarer) {
+        // Only allow if declarer is not an AI (i.e. the user is the human declarer)
+        return !gs.seats[gs.declarer]?.isAI;
+      }
+      // User is dummy but partner (AI) is declarer — AI plays dummy, user does nothing
+      if (store.yourSeat === gs.dummy) return false;
     }
+
     return gs.currentTurn === store.yourSeat;
   };
 

@@ -37,21 +37,36 @@ export default function ShopPage() {
 
   const buy = async (slug: string) => {
     try {
-      await api.post(`/skins/${slug}/buy`);
-      const bal = await api.get<{ balance: number }>('/goats/balance');
-      auth.setGoatBalance(bal.data.balance);
+      const res = await api.post<{ goatBalance: number }>(`/skins/${slug}/buy`);
+      auth.setGoatBalance(res.data.goatBalance);
+      setError('');
       load();
     } catch (err: unknown) {
       setError((err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Purchase failed');
     }
   };
 
+  const skinColor = (slug: string) => {
+    if (slug === 'classic') return 'bg-blue-900 border-blue-700';
+    if (slug === 'ocean') return 'bg-cyan-900 border-cyan-700';
+    if (slug === 'midnight') return 'bg-indigo-950 border-indigo-700';
+    if (slug === 'gold-foil') return 'bg-yellow-900 border-yellow-600';
+    if (slug === 'crimson') return 'bg-red-900 border-red-700';
+    if (slug === 'forest') return 'bg-green-900 border-green-700';
+    return 'bg-navy border-gold/30';
+  };
+
   return (
     <div className="max-w-3xl mx-auto p-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gold">Card Back Skins</h1>
-        <div className="text-gold font-bold">🐐 {auth.goatBalance.toLocaleString()}</div>
+        <div className="flex items-center gap-4">
+          <div className="text-purple-300 font-bold">⭐ {auth.skillPoints.toLocaleString()} Skill</div>
+          <div className="text-gold font-bold">🐐 {auth.goatBalance.toLocaleString()}</div>
+        </div>
       </div>
+
+      <p className="text-cream/50 text-sm mb-4">Earn 🐐 Goats by playing and winning. Use Goats to unlock premium skins.</p>
 
       {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
 
@@ -65,12 +80,7 @@ export default function ShopPage() {
               ${auth.activeCardBackSkin === skin.slug ? 'border-gold' : 'border-gold/20'}
             `}>
               {/* Preview */}
-              <div className={`w-16 h-24 rounded-lg card-shadow border-2 flex items-center justify-center text-2xl
-                ${skin.slug === 'classic' ? 'bg-blue-900 border-blue-700' :
-                  skin.slug === 'ocean' ? 'bg-cyan-900 border-cyan-700' :
-                  skin.slug === 'midnight' ? 'bg-indigo-950 border-indigo-700' :
-                  'bg-yellow-900 border-yellow-600'}
-              `}>
+              <div className={`w-16 h-24 rounded-lg card-shadow border-2 flex items-center justify-center text-2xl ${skinColor(skin.slug)}`}>
                 ✦
               </div>
 
@@ -91,12 +101,13 @@ export default function ShopPage() {
                 </button>
               ) : skin.unlockType === 'progress' ? (
                 <div className="text-cream/40 text-xs text-center">
-                  🔒 Play {skin.unlockThreshold} hands
+                  🔒 Play {skin.unlockThreshold} boards
                 </div>
               ) : skin.goatCost != null ? (
                 <button
                   onClick={() => buy(skin.slug)}
-                  className="text-xs bg-gold hover:bg-gold-light text-navy font-bold px-3 py-1 rounded transition-colors"
+                  disabled={auth.goatBalance < skin.goatCost}
+                  className="text-xs bg-gold hover:bg-yellow-400 disabled:opacity-40 disabled:cursor-not-allowed text-navy font-bold px-3 py-1 rounded transition-colors"
                 >
                   Buy {skin.goatCost} 🐐
                 </button>

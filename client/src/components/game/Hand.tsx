@@ -12,7 +12,7 @@ interface HandProps {
 
 export default function Hand({ cards, onPlay, isYourTurn = false, size = 'md', label }: HandProps) {
   // Sort hand: spades, hearts, diamonds, clubs; within each suit high to low
-  const suitOrder = { spades: 0, hearts: 1, diamonds: 2, clubs: 3 };
+  const suitOrder = { spades: 0, hearts: 1, clubs: 2, diamonds: 3 };
   const rankOrder = ['A', 'K', 'Q', 'J', '10', '9', '8', '7', '6', '5', '4', '3', '2'];
   const sorted = [...cards].sort((a, b) => {
     const suitDiff = suitOrder[a.suit] - suitOrder[b.suit];
@@ -20,7 +20,11 @@ export default function Hand({ cards, onPlay, isYourTurn = false, size = 'md', l
     return rankOrder.indexOf(a.rank) - rankOrder.indexOf(b.rank);
   });
 
-  const overlap = size === 'sm' ? '-ml-5' : size === 'md' ? '-ml-6' : '-ml-7';
+  const overlap = size === 'sm'
+    ? '-ml-5 md:-ml-6 lg:-ml-8'
+    : size === 'md'
+    ? '-ml-7 md:-ml-9 lg:-ml-12'
+    : '-ml-8 sm:-ml-10 md:-ml-12 lg:-ml-14 xl:-ml-16';
 
   return (
     <div className="flex flex-col items-center gap-1">
@@ -40,9 +44,6 @@ export default function Hand({ cards, onPlay, isYourTurn = false, size = 'md', l
             />
           </div>
         ))}
-        {cards.length === 0 && (
-          <div className="text-cream/30 text-sm italic px-4 py-2">No cards</div>
-        )}
       </div>
     </div>
   );

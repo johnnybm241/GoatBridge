@@ -4,6 +4,7 @@ import { SEATS } from '@goatbridge/shared';
 import type { BidCall } from '@goatbridge/shared';
 import type { Card } from '@goatbridge/shared';
 import { sqlite } from '../db/index.js';
+import { logger } from '../logger.js';
 import {
   createRoom,
   getRoom,
@@ -49,6 +50,7 @@ export function setupRoomHandlers(
     socket.join(room.roomCode);
     socketRooms.set(socket.id, room.roomCode);
 
+    logger.info('Room created', { roomCode: room.roomCode, userId, username });
     callback?.({ roomCode: room.roomCode });
 
     emitToRoom(io, room.roomCode, 'room_joined', {
@@ -105,9 +107,19 @@ export function setupRoomHandlers(
     // Check if reconnecting
     const reconnectingSeat = findSeatByUserId(room, userId);
     if (reconnectingSeat && room.seats[reconnectingSeat].disconnected) {
-      // Player is trying to return
+      logger.info('Player reconnecting', { roomCode: payload.roomCode, userId, username, seat: reconnectingSeat });
+      // Cancel the pending bot-replacement timer immediately
+      const timerKey = `${payload.roomCode}:${reconnectingSeat}`;
+      const existingTimer = disconnectTimers.get(timerKey);
+      if (existingTimer) {
+        clearTimeout(existingTimer);
+        disconnectTimers.delete(timerKey);
+      }
+      room.seats[reconnectingSeat].disconnected = false;
+      room.seats[reconnectingSeat].disconnectedAt = null;
+
+      // Non-host players need host approval to reclaim their seat
       if (room.hostUserId !== userId) {
-        // Ask host
         socket.join(payload.roomCode);
         socketRooms.set(socket.id, payload.roomCode);
         const hostSocketId = getSocketId(room.hostUserId);
@@ -119,14 +131,17 @@ export function setupRoomHandlers(
         }
         return;
       }
+      // Host falls through to joinSeat (disconnected already cleared above)
     }
 
     const result = joinSeat(room, userId, username, skin);
     if ('error' in result) {
+      logger.warn('join_room failed', { roomCode: payload.roomCode, userId, username, error: result.error });
       socket.emit('room_error', { message: result.error });
       return;
     }
 
+    logger.info('Player joined room', { roomCode: payload.roomCode, userId, username, seat: result.seat });
     socket.join(payload.roomCode);
     socketRooms.set(socket.id, payload.roomCode);
 
@@ -167,6 +182,7 @@ export function setupRoomHandlers(
       socket.emit('room_error', { message: 'Cannot add bot to that seat' });
       return;
     }
+    logger.info('Bot added', { roomCode: payload.roomCode, seat: payload.seat });
     emitToRoom(io, payload.roomCode, 'room_updated', {
       seats: room.seats,
       status: 'waiting',
@@ -208,6 +224,7 @@ export function setupRoomHandlers(
     }
 
     const { game, hands } = startNewHand(room);
+    logger.info('Game started', { roomCode: payload.roomCode, dealer: game.dealer, handNumber: game.handNumber });
 
     // Send each player their hand privately
     for (const seat of SEATS) {
@@ -368,6 +385,7 @@ export function setupRoomHandlers(
     }
 
     // Mid-game disconnect
+    logger.warn('Player disconnected mid-game', { roomCode, seat, userId });
     room.seats[seat].disconnected = true;
     room.seats[seat].disconnectedAt = Date.now();
     room.seats[seat].isConnected = false;
@@ -384,6 +402,7 @@ export function setupRoomHandlers(
       if (!seatInfo.disconnected) return; // player reconnected
 
       // Replace with bot
+      logger.info('Bot replacing disconnected player', { roomCode, seat });
       seatInfo.originalUserId = seatInfo.userId;
       seatInfo.userId = `bot-${seat}-${Date.now()}`;
       seatInfo.isAI = true;
