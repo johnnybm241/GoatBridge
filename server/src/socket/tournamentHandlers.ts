@@ -86,6 +86,38 @@ export function setupTournamentHandlers(
     io.to(`tournament:${t.tournamentCode}`).emit('tournament_updated', { tournament: toClientTournament(t) });
   });
 
+  // Any logged-in user can register themselves into an open tournament
+  socket.on('join_tournament', (payload: { tournamentCode: string; partnerUserId?: string; partnerDisplayName?: string }) => {
+    // Check if banned
+    const userRow = sqlite.get<{ username: string; is_banned: number }>('SELECT username, is_banned FROM users WHERE id = ?', [userId]);
+    if (!userRow) { socket.emit('room_error', { message: 'User not found' }); return; }
+    if (userRow.is_banned) { socket.emit('room_error', { message: 'You are banned from tournaments' }); return; }
+
+    const t = getTournament(payload.tournamentCode);
+    if (!t) { socket.emit('room_error', { message: 'Tournament not found' }); return; }
+    if (t.status !== 'setup') { socket.emit('room_error', { message: 'Tournament has already started' }); return; }
+
+    const result = addPair(t, userId, userRow.username, payload.partnerUserId, payload.partnerDisplayName);
+    if (result.error) { socket.emit('room_error', { message: result.error }); return; }
+
+    socket.join(`tournament:${t.tournamentCode}`);
+    logger.info('Player self-joined tournament', { tournamentCode: t.tournamentCode, userId, pairId: result.pairId });
+    io.to(`tournament:${t.tournamentCode}`).emit('tournament_updated', { tournament: toClientTournament(t) });
+  });
+
+  // Leave (withdraw) from a tournament during setup
+  socket.on('leave_tournament_pair', (payload: { tournamentCode: string }) => {
+    const t = getTournament(payload.tournamentCode);
+    if (!t) { socket.emit('room_error', { message: 'Tournament not found' }); return; }
+    if (t.status !== 'setup') { socket.emit('room_error', { message: 'Tournament has already started' }); return; }
+
+    const pair = t.pairs.find(p => p.player1.userId === userId || p.player2?.userId === userId);
+    if (!pair) { socket.emit('room_error', { message: 'You are not in this tournament' }); return; }
+
+    removePair(t, pair.pairId);
+    io.to(`tournament:${t.tournamentCode}`).emit('tournament_updated', { tournament: toClientTournament(t) });
+  });
+
   socket.on('start_tournament', (payload: { tournamentCode: string }) => {
     const t = getTournament(payload.tournamentCode);
     if (!t) { socket.emit('room_error', { message: 'Tournament not found' }); return; }

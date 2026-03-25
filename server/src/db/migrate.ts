@@ -172,6 +172,7 @@ export function runMigrations() {
 
   try { sqlite.exec('ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0'); } catch { /* already exists */ }
   try { sqlite.exec('ALTER TABLE users ADD COLUMN can_create_tournament INTEGER NOT NULL DEFAULT 0'); } catch { /* already exists */ }
+  try { sqlite.exec('ALTER TABLE users ADD COLUMN is_banned INTEGER NOT NULL DEFAULT 0'); } catch { /* already exists */ }
 
   try { sqlite.exec(`CREATE TABLE IF NOT EXISTS tournaments (
     id TEXT PRIMARY KEY,

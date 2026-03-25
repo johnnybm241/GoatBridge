@@ -140,6 +140,16 @@ export interface RemovePairEntryPayload {
   pairId: string;
 }
 
+export interface SelfJoinTournamentPayload {
+  tournamentCode: string;
+  partnerUserId?: string;
+  partnerDisplayName?: string;
+}
+
+export interface LeaveTournamentPairPayload {
+  tournamentCode: string;
+}
+
 export interface ClientToServerEvents {
   create_room: () => void;
   join_room: (payload: JoinRoomPayload) => void;
@@ -171,4 +181,6 @@ export interface ClientToServerEvents {
   join_tournament: (payload: JoinTournamentPayload) => void;
   add_pair_entry: (payload: AddPairEntryPayload) => void;
   remove_pair_entry: (payload: RemovePairEntryPayload) => void;
+  join_tournament: (payload: SelfJoinTournamentPayload) => void;
+  leave_tournament_pair: (payload: LeaveTournamentPairPayload) => void;
 }

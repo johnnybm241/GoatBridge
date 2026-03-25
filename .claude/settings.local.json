@@ -1,5 +1,6 @@
 {
   "permissions": {
+    "defaultMode": "bypassPermissions",
     "allow": [
       "Bash(ls /c/Users/johnn/workspace/GoatBridge && git -C /c/Users/johnn/workspace/GoatBridge log --oneline -10 && git -C /c/Users/johnn/workspace/GoatBridge status)",
       "Bash(npm install:*)",

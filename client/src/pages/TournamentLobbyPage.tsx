@@ -21,7 +21,7 @@ export default function TournamentLobbyPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Pair add form
+  // Organizer: pair add form
   const [p1Search, setP1Search] = useState('');
   const [p1Results, setP1Results] = useState<SearchUser[]>([]);
   const [p1Selected, setP1Selected] = useState<SearchUser | null>(null);
@@ -29,8 +29,14 @@ export default function TournamentLobbyPage() {
   const [p2Results, setP2Results] = useState<SearchUser[]>([]);
   const [p2Selected, setP2Selected] = useState<SearchUser | null>(null);
 
+  // Self-join: partner search
+  const [joinPartnerSearch, setJoinPartnerSearch] = useState('');
+  const [joinPartnerResults, setJoinPartnerResults] = useState<SearchUser[]>([]);
+  const [joinPartnerSelected, setJoinPartnerSelected] = useState<SearchUser | null>(null);
+
   const p1DebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const p2DebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const joinPartnerDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!tournamentCode) return;
@@ -95,6 +101,29 @@ export default function TournamentLobbyPage() {
     const socket = getSocket();
     socket.emit('remove_pair_entry', { tournamentCode: t.tournamentCode, pairId });
   };
+
+  const handleSelfJoin = () => {
+    if (!t) return;
+    const socket = getSocket();
+    socket.emit('join_tournament', {
+      tournamentCode: t.tournamentCode,
+      partnerUserId: joinPartnerSelected?.id,
+      partnerDisplayName: joinPartnerSelected?.username,
+    });
+    setJoinPartnerSelected(null);
+    setJoinPartnerSearch('');
+    setJoinPartnerResults([]);
+  };
+
+  const handleSelfLeave = () => {
+    if (!t) return;
+    const socket = getSocket();
+    socket.emit('leave_tournament_pair', { tournamentCode: t.tournamentCode });
+  };
+
+  const myPair = t ? t.pairs.find(
+    (p: PairEntry) => p.player1.userId === userId || p.player2?.userId === userId,
+  ) : null;
 
   const handleStartTournament = () => {
     if (!t) return;
@@ -330,14 +359,100 @@ export default function TournamentLobbyPage() {
         </div>
       )}
 
-      {/* Setup phase — non-organizer view */}
+      {/* Setup phase — non-organizer self-join */}
       {t.status === 'setup' && !isOrganizer && (
-        <div className="bg-navy border border-gold/30 rounded-xl p-6 text-center">
-          <div className="text-4xl mb-3">⏳</div>
-          <p className="text-cream/70">Waiting for the organizer to set up the tournament…</p>
-          <div className="mt-4 text-sm text-cream/50">
-            {t.pairs.length} pair{t.pairs.length !== 1 ? 's' : ''} registered
-          </div>
+        <div className="space-y-4">
+          {myPair ? (
+            /* Already registered */
+            <div className="bg-navy border border-green-500/30 rounded-xl p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-green-400 font-semibold text-sm mb-1">✓ You're registered</div>
+                  <div className="text-cream text-sm">
+                    {myPair.player1.displayName} / {myPair.player2?.displayName ?? 'Bot partner'}
+                  </div>
+                </div>
+                <button
+                  onClick={handleSelfLeave}
+                  className="text-red-400/70 hover:text-red-400 text-xs border border-red-400/20 hover:border-red-400/40 rounded-lg px-3 py-1.5 transition-colors"
+                >
+                  Withdraw
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* Join form */
+            <div className="bg-navy border border-gold/30 rounded-xl p-5">
+              <h2 className="text-gold font-bold mb-1">Join Tournament</h2>
+              <p className="text-cream/50 text-xs mb-4">You will be Player 1. Optionally invite a partner — otherwise you'll be paired with a bot.</p>
+
+              <label className="block text-cream/60 text-xs mb-1.5">Partner (optional)</label>
+              {joinPartnerSelected ? (
+                <div className="flex items-center gap-2 bg-gold/10 border border-gold/30 rounded-lg px-3 py-2 mb-3">
+                  <span className="text-sm text-cream flex-1">{joinPartnerSelected.username}</span>
+                  <button
+                    onClick={() => { setJoinPartnerSelected(null); setJoinPartnerSearch(''); }}
+                    className="text-red-400/60 hover:text-red-400 text-xs"
+                  >✕</button>
+                </div>
+              ) : (
+                <div className="relative mb-3">
+                  <input
+                    type="text"
+                    value={joinPartnerSearch}
+                    onChange={e => {
+                      setJoinPartnerSearch(e.target.value);
+                      searchUsers(e.target.value, joinPartnerDebounceRef, setJoinPartnerResults);
+                    }}
+                    placeholder="Search partner username… (leave empty for bot)"
+                    className="w-full bg-navy border border-gold/30 text-cream rounded-lg px-3 py-2 focus:outline-none focus:border-gold transition-colors text-sm"
+                  />
+                  {joinPartnerResults.length > 0 && (
+                    <div className="absolute left-0 right-0 top-full mt-1 bg-navy border border-gold/30 rounded-lg overflow-hidden z-10 shadow-xl">
+                      {joinPartnerResults.map(u => (
+                        <button
+                          key={u.id}
+                          onClick={() => { setJoinPartnerSelected(u); setJoinPartnerSearch(''); setJoinPartnerResults([]); }}
+                          disabled={t.pairs.some((p: PairEntry) => p.player1.userId === u.id || p.player2?.userId === u.id) || u.id === userId}
+                          className="w-full text-left px-4 py-2 text-sm text-cream hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {u.username}
+                          {(t.pairs.some((p: PairEntry) => p.player1.userId === u.id || p.player2?.userId === u.id)) && ' (already registered)'}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <button
+                onClick={handleSelfJoin}
+                className="bg-gold hover:bg-gold-light text-navy font-bold px-5 py-2 rounded-lg text-sm transition-colors"
+              >
+                Join Tournament
+              </button>
+            </div>
+          )}
+
+          {/* Registered pairs list */}
+          {t.pairs.length > 0 && (
+            <div className="bg-navy border border-gold/20 rounded-xl p-4">
+              <div className="text-cream/60 text-xs font-semibold mb-2">{t.pairs.length} pair{t.pairs.length !== 1 ? 's' : ''} registered</div>
+              <div className="space-y-1.5">
+                {t.pairs.map((pair: PairEntry, i: number) => (
+                  <div key={pair.pairId} className="flex items-center gap-2 text-sm">
+                    <span className="text-cream/30 text-xs w-4">{i + 1}</span>
+                    <span className="text-cream">{getPairName(pair)}</span>
+                    {(pair.player1.userId === userId || pair.player2?.userId === userId) && (
+                      <span className="text-green-400 text-xs">(you)</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="text-center text-cream/30 text-xs py-2">Waiting for organizer to start the tournament…</div>
         </div>
       )}
 

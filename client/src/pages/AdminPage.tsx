@@ -11,6 +11,7 @@ interface AdminUser {
   hands_played: number;
   is_admin: number;
   can_create_tournament: number;
+  is_banned: number;
   created_at: number;
 }
 
@@ -42,19 +43,29 @@ export default function AdminPage() {
     debounceRef.current = setTimeout(() => fetchUsers(val), 300);
   };
 
-  const toggleRole = async (userId: string, field: 'isAdmin' | 'canCreateTournament', current: boolean) => {
+  const toggleRole = async (
+    userId: string,
+    field: 'isAdmin' | 'canCreateTournament' | 'isBanned',
+    current: boolean,
+    username: string,
+  ) => {
+    // Safety confirmation for banning
+    if (field === 'isBanned' && !current) {
+      if (!window.confirm(`Ban ${username}? They won't be able to join tournaments.`)) return;
+    }
     try {
-      const res = await api.patch<{ user: { id: string; username: string; isAdmin: boolean; canCreateTournament: boolean } }>(
-        `/admin/users/${userId}/roles`,
-        { [field]: !current },
-      );
+      const res = await api.patch<{
+        user: { id: string; username: string; isAdmin: boolean; canCreateTournament: boolean; isBanned: boolean };
+      }>(`/admin/users/${userId}/roles`, { [field]: !current });
       setUsers(prev => prev.map(u => u.id === userId ? {
         ...u,
         is_admin: res.data.user.isAdmin ? 1 : 0,
         can_create_tournament: res.data.user.canCreateTournament ? 1 : 0,
+        is_banned: res.data.user.isBanned ? 1 : 0,
       } : u));
-    } catch {
-      setError('Failed to update role');
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setError(msg ?? 'Failed to update role');
     }
   };
 
@@ -103,47 +114,68 @@ export default function AdminPage() {
               <tr className="border-b border-gold/20 bg-white/5">
                 <th className="text-left px-4 py-3 text-gold font-semibold">Username</th>
                 <th className="text-right px-4 py-3 text-gold font-semibold">Bleats</th>
-                <th className="text-right px-4 py-3 text-gold font-semibold">Boards Played</th>
+                <th className="text-right px-4 py-3 text-gold font-semibold">Boards</th>
                 <th className="text-center px-4 py-3 text-gold font-semibold">Admin</th>
                 <th className="text-center px-4 py-3 text-gold font-semibold">Tournament Organizer</th>
+                <th className="text-center px-4 py-3 text-gold font-semibold">Ban</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="text-center py-8 text-cream/40">Loading…</td>
+                  <td colSpan={6} className="text-center py-8 text-cream/40">Loading…</td>
                 </tr>
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="text-center py-8 text-cream/40">No users found</td>
+                  <td colSpan={6} className="text-center py-8 text-cream/40">No users found</td>
                 </tr>
               ) : users.map((user, i) => (
-                <tr key={user.id} className={`border-b border-gold/10 ${i % 2 === 0 ? '' : 'bg-white/2'} hover:bg-white/5 transition-colors`}>
-                  <td className="px-4 py-3 text-cream font-medium">{user.username}</td>
+                <tr
+                  key={user.id}
+                  className={`border-b border-gold/10 transition-colors ${
+                    user.is_banned ? 'opacity-60 bg-red-900/10' : i % 2 === 0 ? '' : 'bg-white/2'
+                  } hover:bg-white/5`}
+                >
+                  <td className="px-4 py-3 text-cream font-medium">
+                    {user.username}
+                    {!!user.is_banned && <span className="ml-2 text-red-400 text-xs">(banned)</span>}
+                  </td>
                   <td className="px-4 py-3 text-cream/70 text-right">{user.bleats.toLocaleString()}</td>
                   <td className="px-4 py-3 text-cream/70 text-right">{user.hands_played.toLocaleString()}</td>
                   <td className="px-4 py-3 text-center">
                     <button
-                      onClick={() => toggleRole(user.id, 'isAdmin', !!user.is_admin)}
+                      onClick={() => toggleRole(user.id, 'isAdmin', !!user.is_admin, user.username)}
                       className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
                         user.is_admin
                           ? 'bg-gold/20 text-gold border border-gold/40 hover:bg-gold/30'
                           : 'bg-white/5 text-cream/40 border border-white/10 hover:bg-white/10'
                       }`}
                     >
-                      {user.is_admin ? 'Admin' : 'Off'}
+                      {user.is_admin ? '✓ Admin' : 'Off'}
                     </button>
                   </td>
                   <td className="px-4 py-3 text-center">
                     <button
-                      onClick={() => toggleRole(user.id, 'canCreateTournament', !!user.can_create_tournament)}
+                      onClick={() => toggleRole(user.id, 'canCreateTournament', !!user.can_create_tournament, user.username)}
                       className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
                         user.can_create_tournament
                           ? 'bg-green-500/20 text-green-400 border border-green-500/40 hover:bg-green-500/30'
                           : 'bg-white/5 text-cream/40 border border-white/10 hover:bg-white/10'
                       }`}
                     >
-                      {user.can_create_tournament ? 'Enabled' : 'Off'}
+                      {user.can_create_tournament ? '✓ Enabled' : 'Off'}
+                    </button>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <button
+                      onClick={() => toggleRole(user.id, 'isBanned', !!user.is_banned, user.username)}
+                      className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
+                        user.is_banned
+                          ? 'bg-red-500/20 text-red-400 border border-red-500/40 hover:bg-red-500/30'
+                          : 'bg-white/5 text-cream/40 border border-white/10 hover:bg-white/10 hover:text-red-400/60'
+                      }`}
+                    >
+                      {user.is_banned ? '🚫 Banned' : 'Ban'}
                     </button>
                   </td>
                 </tr>
