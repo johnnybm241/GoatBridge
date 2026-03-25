@@ -16,6 +16,7 @@ export default function TournamentPage() {
   const [name, setName] = useState('');
   const [totalBoards, setTotalBoards] = useState(16);
   const [boardsPerRound, setBoardsPerRound] = useState(4);
+  const [entryFee, setEntryFee] = useState(0);
   const [error, setError] = useState('');
   const setTournament = useTournamentStore(s => s.setTournament);
 
@@ -39,7 +40,7 @@ export default function TournamentPage() {
         setCreating(false);
         navigate(`/tournaments/${payload.tournament.tournamentCode}`);
       });
-      socket.emit('create_tournament', { name: name.trim(), totalBoards, boardsPerRound });
+      socket.emit('create_tournament', { name: name.trim(), totalBoards, boardsPerRound, entryFee });
       setTimeout(() => setCreating(false), 5000);
     } catch {
       setError('Not connected. Please refresh.');
@@ -111,6 +112,20 @@ export default function TournamentPage() {
                 />
               </div>
             </div>
+            <div>
+              <label className="block text-cream/80 text-sm mb-1">Entry Fee 🐐 <span className="text-cream/40 font-normal">(0 = free)</span></label>
+              <input
+                type="number"
+                min={0}
+                max={10000}
+                value={entryFee}
+                onChange={e => setEntryFee(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+                className="w-full bg-navy border border-gold/30 text-cream rounded-lg px-3 py-2 focus:outline-none focus:border-gold transition-colors text-sm"
+              />
+              {entryFee > 0 && (
+                <p className="text-cream/40 text-xs mt-1">Players will be charged {entryFee} Goats to enter. Refunded automatically if the tournament is cancelled.</p>
+              )}
+            </div>
             {totalBoards >= 2 && boardsPerRound >= 2 && (
               <p className="text-cream/40 text-xs">
                 {Math.ceil(totalBoards / boardsPerRound)} round{Math.ceil(totalBoards / boardsPerRound) !== 1 ? 's' : ''} estimated
@@ -145,6 +160,7 @@ export default function TournamentPage() {
                 <div className="text-cream font-semibold">{t.name}</div>
                 <div className="text-cream/50 text-xs mt-0.5">
                   Swiss Pairs &middot; {t.totalBoards} boards &middot; {t.boardsPerRound}/round ({estimatedRounds(t)} rounds) &middot; {t.pairs?.length ?? 0} pairs
+                  {t.entryFee > 0 && <span className="text-gold"> &middot; {t.entryFee} 🐐 entry</span>}
                   {' '}&middot; <span className={
                     t.status === 'setup' ? 'text-yellow-400'
                     : t.status === 'in_progress' ? 'text-green-400'

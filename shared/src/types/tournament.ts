@@ -44,7 +44,8 @@ export interface TournamentState {
   organizerUserId: string;
   totalBoards: number;
   boardsPerRound: number;
-  status: 'setup' | 'in_progress' | 'complete';
+  entryFee: number;       // 0 = free
+  status: 'setup' | 'in_progress' | 'complete' | 'cancelled';
   pairs: PairEntry[];
   rounds: SwissRound[];
   currentRound: number; // 0 = not started, 1+ = round number

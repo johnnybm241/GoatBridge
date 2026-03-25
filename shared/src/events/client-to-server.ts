@@ -109,6 +109,7 @@ export interface CreateTournamentPayload {
   name: string;
   totalBoards: number;
   boardsPerRound: number;
+  entryFee?: number;
 }
 
 export interface JoinTournamentPayload {

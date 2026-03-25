@@ -266,6 +266,7 @@ export interface ServerToClientEvents {
   tournament_state: (payload: TournamentStatePayload) => void;
   tournament_updated: (payload: TournamentStatePayload) => void;
   tournament_complete: (payload: TournamentCompletePayload) => void;
+  tournament_cancelled: (payload: TournamentCompletePayload) => void;
   tournament_joined: (payload: TournamentStatePayload) => void;
   pairs_table_started: (payload: PairsTableStartedPayload) => void;
   hand_swapped: (payload: HandSwappedPayload) => void;

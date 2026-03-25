@@ -9,21 +9,29 @@ import type {
   TournamentStanding,
 } from '@goatbridge/shared';
 
+export interface PaidEntry {
+  userId: string;
+  pairId: string;
+  amount: number;
+}
+
 export interface Tournament {
   tournamentCode: string;
   name: string;
   organizerUserId: string;
   totalBoards: number;
   boardsPerRound: number;
-  status: 'setup' | 'in_progress' | 'complete';
+  entryFee: number;       // 0 = free
+  status: 'setup' | 'in_progress' | 'complete' | 'cancelled';
   pairs: PairEntry[];
   rounds: SwissRound[];
-  currentRound: number; // 0 = not started, 1+ = round number
+  currentRound: number;
   boardResults: PairBoardResult[];
   standings: TournamentStanding[];
   createdAt: number;
-  // Server-only: pre-dealt boards indexed 0 = board 1
+  // Server-only
   preDealtBoards: Array<Record<Seat, Card[]>>;
+  paidEntries: PaidEntry[];
 }
 
 const tournaments = new Map<string, Tournament>();
@@ -62,6 +70,7 @@ export function createTournament(
   name: string,
   totalBoards: number,
   boardsPerRound: number,
+  entryFee = 0,
 ): Tournament {
   let code = generateTournamentCode();
   while (tournaments.has(code)) code = generateTournamentCode();
@@ -72,6 +81,7 @@ export function createTournament(
     organizerUserId,
     totalBoards,
     boardsPerRound,
+    entryFee: Math.max(0, Math.floor(entryFee)),
     status: 'setup',
     pairs: [],
     rounds: [],
@@ -80,6 +90,7 @@ export function createTournament(
     standings: [],
     createdAt: Date.now(),
     preDealtBoards: [],
+    paidEntries: [],
   };
   tournaments.set(code, tournament);
   return tournament;
@@ -89,10 +100,31 @@ export function getTournament(code: string): Tournament | undefined {
   return tournaments.get(code);
 }
 
-/** Strip server-only preDealtBoards before sending to clients. */
-export function toClientTournament(t: Tournament): Omit<Tournament, 'preDealtBoards'> {
-  const { preDealtBoards: _ignored, ...clientSafe } = t;
+/** Strip server-only fields before sending to clients. */
+export function toClientTournament(t: Tournament): Omit<Tournament, 'preDealtBoards' | 'paidEntries'> {
+  const { preDealtBoards: _p, paidEntries: _pe, ...clientSafe } = t;
   return clientSafe;
+}
+
+/** Cancel tournament — mark as cancelled. Returns list of paid entries for refund. */
+export function cancelTournament(t: Tournament): PaidEntry[] {
+  t.status = 'cancelled';
+  const refunds = [...t.paidEntries];
+  t.paidEntries = [];
+  return refunds;
+}
+
+/** Record that a pair paid the entry fee. */
+export function recordEntryPayment(t: Tournament, userId: string, pairId: string, amount: number): void {
+  t.paidEntries.push({ userId, pairId, amount });
+}
+
+/** Remove a paid entry (on withdraw). Returns the amount to refund, or 0 if not found. */
+export function removeEntryPayment(t: Tournament, pairId: string): number {
+  const idx = t.paidEntries.findIndex(e => e.pairId === pairId);
+  if (idx === -1) return 0;
+  const [entry] = t.paidEntries.splice(idx, 1);
+  return entry?.amount ?? 0;
 }
 
 export function getOpenTournaments(): Tournament[] {
@@ -131,8 +163,12 @@ export function removePair(t: Tournament, pairId: string): void {
   t.pairs = t.pairs.filter(p => p.pairId !== pairId);
 }
 
-export function startTournament(t: Tournament): { error?: string } {
-  if (t.pairs.length < 1) return { error: 'Need at least 1 pair to start' };
+export function startTournament(t: Tournament): { error?: string; cancelled?: boolean } {
+  // If fewer than 2 pairs joined, auto-cancel
+  if (t.pairs.length < 2) {
+    t.status = 'cancelled';
+    return { cancelled: true };
+  }
 
   // Pre-deal all boards upfront
   t.preDealtBoards = [];

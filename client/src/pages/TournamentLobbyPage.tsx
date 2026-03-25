@@ -55,12 +55,19 @@ export default function TournamentLobbyPage() {
     const socket = getSocket();
     const onUpdated = (payload: { tournament: TournamentState }) => setTournament(payload.tournament);
     const onState = (payload: { tournament: TournamentState }) => setTournament(payload.tournament);
+    const onCancelled = (payload: { tournamentCode: string }) => {
+      if (payload.tournamentCode === tournamentCode) {
+        // Force-refresh the tournament state (already emitted as tournament_updated too)
+      }
+    };
     socket.on('tournament_updated', onUpdated);
     socket.on('tournament_state', onState);
+    socket.on('tournament_cancelled', onCancelled);
 
     return () => {
       socket.off('tournament_updated', onUpdated);
       socket.off('tournament_state', onState);
+      socket.off('tournament_cancelled', onCancelled);
       try { socket.emit('leave_tournament_lobby', { tournamentCode }); } catch { /* not connected */ }
     };
   }, [tournamentCode]);
@@ -194,9 +201,10 @@ export default function TournamentLobbyPage() {
                 <span className={`text-xs px-2 py-0.5 rounded-full border ${
                   t.status === 'setup' ? 'text-yellow-400 border-yellow-400/30 bg-yellow-400/10'
                   : t.status === 'in_progress' ? 'text-green-400 border-green-400/30 bg-green-400/10'
+                  : t.status === 'cancelled' ? 'text-red-400 border-red-400/30 bg-red-400/10'
                   : 'text-cream/30 border-white/10 bg-white/5'
                 }`}>
-                  {t.status === 'setup' ? 'Setup' : t.status === 'in_progress' ? 'In Progress' : 'Complete'}
+                  {t.status === 'setup' ? 'Open — Accepting Entries' : t.status === 'in_progress' ? 'In Progress' : t.status === 'cancelled' ? '⚠ Cancelled' : 'Complete'}
                 </span>
                 <span className="text-cream/40 text-xs">Swiss Pairs</span>
                 {t.status === 'in_progress' && (
@@ -224,6 +232,8 @@ export default function TournamentLobbyPage() {
         <span>{t.boardsPerRound} boards/round</span>
         <span>{totalRounds} rounds</span>
         <span>{t.pairs.length} pairs</span>
+        {t.entryFee > 0 && <span className="text-gold font-semibold">{t.entryFee} 🐐 entry fee</span>}
+        {t.entryFee === 0 && <span className="text-green-400/70">Free entry</span>}
       </div>
 
       {/* ── SETUP PHASE ── */}
@@ -344,18 +354,35 @@ export default function TournamentLobbyPage() {
           {/* Start button */}
           <div className="flex items-center justify-between">
             <div>
-              {t.pairs.length < 1 && (
-                <p className="text-cream/40 text-xs">Need at least 1 pair to start.</p>
+              {t.pairs.length < 2 && t.pairs.length > 0 && (
+                <p className="text-yellow-400/70 text-xs">⚠ Only 1 pair registered. Starting will auto-cancel and refund any entry fees.</p>
+              )}
+              {t.pairs.length === 0 && (
+                <p className="text-cream/40 text-xs">Waiting for pairs to join…</p>
               )}
             </div>
             <button
               onClick={handleStartTournament}
-              disabled={t.pairs.length < 1}
-              className="bg-gold hover:bg-gold-light text-navy font-bold px-6 py-2.5 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="bg-gold hover:bg-gold-light text-navy font-bold px-6 py-2.5 rounded-lg transition-colors"
             >
-              Start Tournament
+              {t.pairs.length < 2 ? 'Close Tournament' : 'Start Tournament'}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Cancelled state */}
+      {t.status === 'cancelled' && (
+        <div className="bg-navy border border-red-500/30 rounded-xl p-6 text-center">
+          <div className="text-4xl mb-3">⚠️</div>
+          <p className="text-red-400 font-bold text-lg mb-1">Tournament Cancelled</p>
+          <p className="text-cream/60 text-sm">
+            Not enough pairs joined before the tournament started.
+            {t.entryFee > 0 && ' All entry fees have been refunded to your Goat balance.'}
+          </p>
+          <button onClick={() => navigate('/tournaments')} className="mt-4 text-gold text-sm hover:underline">
+            Back to Tournaments
+          </button>
         </div>
       )}
 
@@ -429,8 +456,11 @@ export default function TournamentLobbyPage() {
                 onClick={handleSelfJoin}
                 className="bg-gold hover:bg-gold-light text-navy font-bold px-5 py-2 rounded-lg text-sm transition-colors"
               >
-                Join Tournament
+                {t.entryFee > 0 ? `Join — ${t.entryFee} 🐐` : 'Join Tournament'}
               </button>
+              {t.entryFee > 0 && (
+                <p className="text-cream/40 text-xs mt-2">Entry fee is refunded if the tournament is cancelled.</p>
+              )}
             </div>
           )}
 
