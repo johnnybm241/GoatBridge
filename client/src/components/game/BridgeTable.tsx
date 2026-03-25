@@ -206,10 +206,11 @@ export default function BridgeTable({
     ) : null;
 
     if (isBottom) {
+      const bottomCls = phase === 'bidding' ? 'bottom-40 sm:bottom-0' : 'bottom-0';
       return (
         <div
           key={seat}
-          className="absolute bottom-0 left-1/2 -translate-x-1/2 flex flex-col-reverse items-center gap-1 z-10 pb-2"
+          className={`absolute ${bottomCls} left-1/2 -translate-x-1/2 flex flex-col-reverse items-center gap-1 z-10 pb-2 transition-all duration-200`}
         >
           {phase === 'playing' && completedTricks.length > 0 && (
             <TrickFan completedTricks={completedTricks} yourSeat={yourSeat} skin={activeCardBackSkin} />
@@ -240,7 +241,7 @@ export default function BridgeTable({
       return (
         <div
           key={seat}
-          className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-2 z-10"
+          className="absolute left-0 sm:left-2 top-1/2 -translate-y-1/2 flex items-center gap-1 sm:gap-2 z-10"
         >
           {nameplate}
           {hand}
@@ -251,7 +252,7 @@ export default function BridgeTable({
     return (
       <div
         key={seat}
-        className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-row-reverse items-center gap-2 z-10"
+        className="absolute right-0 sm:right-2 top-1/2 -translate-y-1/2 flex flex-row-reverse items-center gap-1 sm:gap-2 z-10"
       >
         {nameplate}
         {hand}
@@ -260,9 +261,9 @@ export default function BridgeTable({
   };
 
   return (
-    <div className="relative w-full h-full felt-texture rounded-2xl overflow-hidden shadow-2xl border-4 border-felt-dark/50 min-h-[280px] sm:min-h-[380px] md:min-h-[480px] lg:min-h-[560px]">
+    <div className="relative w-full h-full felt-texture rounded-none sm:rounded-2xl overflow-hidden shadow-2xl border-0 sm:border-4 border-felt-dark/50 min-h-[480px] sm:min-h-[420px] md:min-h-[500px] lg:min-h-[560px]">
       {/* Table oval */}
-      <div className="absolute inset-8 rounded-full border-2 border-felt-light/20 pointer-events-none" />
+      <div className="absolute inset-4 sm:inset-8 rounded-full border-2 border-felt-light/20 pointer-events-none" />
 
       {/* Contract display */}
       {contractText && (
@@ -313,7 +314,7 @@ export default function BridgeTable({
       </div>
 
       {/* Scoreboard */}
-      <div className="absolute top-2 right-2 z-20">
+      <div className="absolute top-1 right-1 sm:top-2 sm:right-2 z-20 scale-75 sm:scale-100 origin-top-right">
         <Scoreboard scores={scores} vulnerability={vulnerability} />
       </div>
 
@@ -326,7 +327,7 @@ export default function BridgeTable({
 
       {/* Bidding box — always visible during bidding, disabled when not your turn */}
       {phase === 'bidding' && (
-        <div className="absolute bottom-4 right-4 z-30">
+        <div className="absolute bottom-2 right-2 z-30 max-h-[38vh] sm:max-h-none overflow-y-auto">
           <BiddingBox
             biddingState={bidding}
             onBid={onBid}

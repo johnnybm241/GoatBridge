@@ -132,7 +132,7 @@ export function removePair(t: Tournament, pairId: string): void {
 }
 
 export function startTournament(t: Tournament): { error?: string } {
-  if (t.pairs.length < 2) return { error: 'Need at least 2 pairs to start' };
+  if (t.pairs.length < 1) return { error: 'Need at least 1 pair to start' };
 
   // Pre-deal all boards upfront
   t.preDealtBoards = [];

@@ -40,7 +40,7 @@ export default function DummyHand({ cards, position, onPlay, canPlay = false, tr
           </span>
           <div className="flex flex-col">
             {bySuit[suit].map((card, i) => (
-              <div key={`${card.suit}-${card.rank}`} className={i > 0 ? '-mt-[54px] sm:-mt-[70px] md:-mt-[86px] lg:-mt-[106px] xl:-mt-[134px]' : ''} style={{ zIndex: i + 1 }}>
+              <div key={`${card.suit}-${card.rank}`} className={i > 0 ? '-mt-[38px] sm:-mt-[52px] md:-mt-[72px] lg:-mt-[88px] xl:-mt-[104px]' : ''} style={{ zIndex: i + 1 }}>
                 <Card
                   card={card}
                   size="lg"

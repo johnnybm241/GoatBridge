@@ -24,7 +24,7 @@ export default function Hand({ cards, onPlay, isYourTurn = false, size = 'md', l
     ? '-ml-5 md:-ml-6 lg:-ml-8'
     : size === 'md'
     ? '-ml-7 md:-ml-9 lg:-ml-12'
-    : '-ml-8 sm:-ml-10 md:-ml-12 lg:-ml-14 xl:-ml-16';
+    : '-ml-7 sm:-ml-8 md:-ml-10 lg:-ml-12 xl:-ml-14';
 
   return (
     <div className="flex flex-col items-center gap-1">

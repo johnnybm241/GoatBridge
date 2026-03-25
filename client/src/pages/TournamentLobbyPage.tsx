@@ -344,13 +344,13 @@ export default function TournamentLobbyPage() {
           {/* Start button */}
           <div className="flex items-center justify-between">
             <div>
-              {t.pairs.length < 2 && (
-                <p className="text-cream/40 text-xs">Need at least 2 pairs to start.</p>
+              {t.pairs.length < 1 && (
+                <p className="text-cream/40 text-xs">Need at least 1 pair to start.</p>
               )}
             </div>
             <button
               onClick={handleStartTournament}
-              disabled={t.pairs.length < 2}
+              disabled={t.pairs.length < 1}
               className="bg-gold hover:bg-gold-light text-navy font-bold px-6 py-2.5 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Start Tournament

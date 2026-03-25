@@ -119,11 +119,11 @@ export default function GamePage() {
   }, [bleatsToast?.id]);
 
   return (
-    <div className="flex h-full gap-2 p-2 md:gap-3 md:p-3 bg-navy">
+    <div className="flex h-full gap-0 p-0 sm:gap-2 sm:p-2 md:gap-3 md:p-3 bg-navy">
       {/* Main table */}
       <div className="flex-1 flex flex-col gap-2 md:gap-3 min-w-0">
         {/* Room code header */}
-        <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center justify-between text-xs sm:text-sm px-2 sm:px-0 py-1 sm:py-0">
           <div className="text-cream/50">
             Room: <span className="text-gold font-mono font-bold tracking-widest">{roomCode}</span>
             {isSpectator && <span className="ml-2 text-blue-400">(Spectating)</span>}

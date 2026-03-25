@@ -15,13 +15,13 @@ interface CardProps {
 const SIZE_CLASSES = {
   sm: 'w-10 h-14 md:w-12 md:h-16 lg:w-14 lg:h-20 text-xs',
   md: 'w-12 h-16 md:w-16 md:h-24 lg:w-20 lg:h-28 text-xs md:text-sm',
-  lg: 'w-14 h-20 sm:w-16 sm:h-24 md:w-20 md:h-28 lg:w-24 lg:h-32 xl:w-28 xl:h-40 text-xs sm:text-sm md:text-base lg:text-lg',
+  lg: 'w-10 h-14 sm:w-12 sm:h-[4.5rem] md:w-16 md:h-24 lg:w-20 lg:h-28 xl:w-24 xl:h-32 text-xs md:text-sm lg:text-base',
 };
 
 const CORNER_SUIT_SIZE = {
   sm: 'text-xs',
   md: 'text-xs md:text-sm',
-  lg: 'text-sm md:text-base lg:text-xl xl:text-2xl',
+  lg: 'text-xs sm:text-xs md:text-sm lg:text-base xl:text-lg',
 };
 
 const SUIT_COLORS = {
@@ -63,7 +63,7 @@ export default function Card({ card, onClick, playable = false, size = 'md', fac
         <div>{card.rank}</div>
         <div className={cornerSuitSize}>{symbol}</div>
       </div>
-      <div className={`${suitColor} text-center text-base md:text-xl leading-none`}>{symbol}</div>
+      <div className={`${suitColor} text-center text-xs sm:text-sm md:text-base lg:text-lg leading-none`}>{symbol}</div>
     </motion.div>
   );
 }
