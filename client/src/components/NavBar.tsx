@@ -27,6 +27,7 @@ export default function NavBar() {
         <Link to="/partnerships" className="hidden md:inline text-cream/80 hover:text-cream text-sm transition-colors">Partners</Link>
         <Link to="/team-matches" className="hidden sm:inline text-cream/80 hover:text-cream text-sm transition-colors">Teams</Link>
         <Link to="/tournaments" className="hidden sm:inline text-cream/80 hover:text-cream text-sm transition-colors">Tournaments</Link>
+        <Link to="/history" className="hidden sm:inline text-cream/80 hover:text-cream text-sm transition-colors">History</Link>
         <Link to="/shop" className="hidden sm:inline text-cream/80 hover:text-cream text-sm transition-colors">Shop</Link>
         {isAdmin && (
           <Link to="/admin" className="hidden sm:inline text-gold/70 hover:text-gold text-sm transition-colors font-semibold">

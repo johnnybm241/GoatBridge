@@ -14,6 +14,7 @@ import TeamMatchLobbyPage from './pages/TeamMatchLobbyPage.js';
 import AdminPage from './pages/AdminPage.js';
 import TournamentPage from './pages/TournamentPage.js';
 import TournamentLobbyPage from './pages/TournamentLobbyPage.js';
+import HistoryPage from './pages/HistoryPage.js';
 import NavBar from './components/NavBar.js';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -44,6 +45,7 @@ export default function App() {
         <Route path="/admin" element={<PrivateRoute><AdminPage /></PrivateRoute>} />
         <Route path="/tournaments" element={<PrivateRoute><TournamentPage /></PrivateRoute>} />
         <Route path="/tournaments/:tournamentCode" element={<PrivateRoute><TournamentLobbyPage /></PrivateRoute>} />
+        <Route path="/history" element={<PrivateRoute><HistoryPage /></PrivateRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       </div>

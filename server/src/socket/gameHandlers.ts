@@ -662,7 +662,7 @@ function handlePairsBoardResult(
 
   table.boardsComplete++;
 
-  // Store completed board for post-game review
+  // Store completed board for post-game review (in-memory + persisted to DB)
   if (room.game && room.pairsPreDealtBoards) {
     const boardIdx = table.boardsComplete - 1; // already incremented
     const deal = room.pairsPreDealtBoards[boardIdx];
@@ -684,6 +684,7 @@ function handlePairsBoardResult(
         completedTricks: room.game.completedTricks as import('@goatbridge/shared').Trick[],
       };
       tournament.completedBoards.push(boardRecord);
+      persistTournamentBoard(tournament, boardRecord);
     }
   }
 
@@ -725,6 +726,49 @@ function handlePairsBoardResult(
         callStartRoundFn(t, t.currentRound);
       }
     });
+  }
+}
+
+function persistTournamentBoard(tournament: import('../tournaments/tournamentManager.js').Tournament, board: TournamentBoardRecord): void {
+  try {
+    const nsPair = tournament.pairs.find(p => p.pairId === board.nsPairId);
+    const ewPair = tournament.pairs.find(p => p.pairId === board.ewPairId);
+    sqlite.run(
+      `INSERT OR IGNORE INTO tournament_boards
+        (id, tournament_code, tournament_name, board_number, round_number, table_index,
+         ns_pair_id, ew_pair_id, ns_player1_user_id, ns_player2_user_id, ew_player1_user_id, ew_player2_user_id,
+         ns_display, ew_display, dealer, vulnerability, deal_json, bidding_json,
+         contract_json, declarer_seat, tricks_made, ns_raw_score, play_json, played_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        uuidv4(),
+        tournament.tournamentCode,
+        tournament.name,
+        board.boardNumber,
+        board.roundNumber,
+        board.tableIndex,
+        board.nsPairId,
+        board.ewPairId,
+        nsPair?.player1.userId ?? null,
+        nsPair?.player2?.userId ?? null,
+        ewPair?.player1.userId ?? null,
+        ewPair?.player2?.userId ?? null,
+        nsPair ? `${nsPair.player1.displayName} / ${nsPair.player2?.displayName ?? 'Bot'}` : board.nsPairId,
+        ewPair ? `${ewPair.player1.displayName} / ${ewPair.player2?.displayName ?? 'Bot'}` : board.ewPairId,
+        board.dealer,
+        board.vulnerability,
+        JSON.stringify(board.deal),
+        JSON.stringify(board.biddingCalls),
+        JSON.stringify(board.contract),
+        board.declarerSeat,
+        board.tricksMade,
+        board.nsRawScore,
+        JSON.stringify(board.completedTricks),
+        Date.now(),
+      ],
+    );
+  } catch {
+    // Non-fatal
   }
 }
 

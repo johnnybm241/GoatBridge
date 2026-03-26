@@ -13,6 +13,7 @@ import roomRoutes from './rooms/routes.js';
 import teamMatchRoutes from './teamMatches/routes.js';
 import adminRoutes from './admin/routes.js';
 import tournamentRoutes from './tournaments/routes.js';
+import historyRoutes from './history/routes.js';
 
 // Run DB migrations on startup
 runMigrations();
@@ -36,6 +37,7 @@ app.use('/rooms', roomRoutes);
 app.use('/team-matches', teamMatchRoutes);
 app.use('/admin', adminRoutes);
 app.use('/tournaments', tournamentRoutes);
+app.use('/history', historyRoutes);
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 

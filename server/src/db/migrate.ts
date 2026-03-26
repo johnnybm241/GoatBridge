@@ -185,6 +185,33 @@ export function runMigrations() {
     completed_at INTEGER
   )`); } catch { /* already exists */ }
 
+  try { sqlite.exec(`CREATE TABLE IF NOT EXISTS tournament_boards (
+    id TEXT PRIMARY KEY,
+    tournament_code TEXT NOT NULL,
+    tournament_name TEXT NOT NULL,
+    board_number INTEGER NOT NULL,
+    round_number INTEGER NOT NULL,
+    table_index INTEGER NOT NULL,
+    ns_pair_id TEXT NOT NULL,
+    ew_pair_id TEXT NOT NULL,
+    ns_player1_user_id TEXT,
+    ns_player2_user_id TEXT,
+    ew_player1_user_id TEXT,
+    ew_player2_user_id TEXT,
+    ns_display TEXT NOT NULL,
+    ew_display TEXT NOT NULL,
+    dealer TEXT NOT NULL,
+    vulnerability TEXT NOT NULL,
+    deal_json TEXT NOT NULL,
+    bidding_json TEXT NOT NULL,
+    contract_json TEXT NOT NULL,
+    declarer_seat TEXT NOT NULL,
+    tricks_made INTEGER NOT NULL,
+    ns_raw_score INTEGER NOT NULL,
+    play_json TEXT NOT NULL,
+    played_at INTEGER NOT NULL
+  )`); } catch { /* already exists */ }
+
   // Seed admin user
   try { sqlite.run('UPDATE users SET is_admin = 1, can_create_tournament = 1 WHERE username = ?', ['Johnnybm']); } catch { /* non-fatal */ }
 

@@ -15,6 +15,7 @@ export default defineConfig({
       '/team-matches': 'http://localhost:3001',
       '/tournaments': 'http://localhost:3001',
       '/admin': 'http://localhost:3001',
+      '/history': 'http://localhost:3001',
       '/health': 'http://localhost:3001',
     },
   },
