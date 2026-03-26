@@ -113,10 +113,6 @@ export interface CreateTournamentPayload {
   scheduledStartAt?: number; // epoch ms — undefined = manual start
 }
 
-export interface JoinTournamentPayload {
-  tournamentCode: string;
-}
-
 export interface JoinTournamentLobbyPayload {
   tournamentCode: string;
 }
@@ -180,9 +176,8 @@ export interface ClientToServerEvents {
   join_tournament_lobby: (payload: JoinTournamentLobbyPayload) => void;
   leave_tournament_lobby: (payload: LeaveTournamentLobbyPayload) => void;
   start_tournament: (payload: StartTournamentPayload) => void;
-  join_tournament: (payload: JoinTournamentPayload) => void;
+  join_tournament: (payload: SelfJoinTournamentPayload) => void;
   add_pair_entry: (payload: AddPairEntryPayload) => void;
   remove_pair_entry: (payload: RemovePairEntryPayload) => void;
-  join_tournament: (payload: SelfJoinTournamentPayload) => void;
   leave_tournament_pair: (payload: LeaveTournamentPairPayload) => void;
 }

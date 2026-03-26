@@ -277,7 +277,7 @@ export function validateClaimAllTricks(room: GameRoom): boolean {
 
   if (oppCards.length === 0) return true; // no tricks left to lose
 
-  const rankVal = (r: string) => RANK_ORDER.indexOf(r);
+  const rankVal = (r: string) => RANK_ORDER.indexOf(r as (typeof RANK_ORDER)[number]);
   const myTrumps = trump ? myCards.filter(c => c.suit === trump) : [];
 
   for (const suit of ['spades', 'hearts', 'diamonds', 'clubs'] as Suit[]) {

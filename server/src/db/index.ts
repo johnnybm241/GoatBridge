@@ -1,4 +1,5 @@
 import initSqlJs from 'sql.js';
+import type { BindParams } from 'sql.js';
 import { drizzle } from 'drizzle-orm/sql-js';
 import * as schema from './schema.js';
 import { config } from '../config.js';
@@ -37,22 +38,22 @@ export const sqlite = {
     sqliteDb.exec(sql);
     schedulePersist();
   },
-  run(sql: string, params?: unknown[]) {
+  run(sql: string, params?: BindParams) {
     const stmt = sqliteDb.prepare(sql);
-    stmt.run(params as unknown[]);
+    stmt.run(params);
     stmt.free();
     schedulePersist();
   },
-  get<T = unknown>(sql: string, params?: unknown[]): T | undefined {
+  get<T = unknown>(sql: string, params?: BindParams): T | undefined {
     const stmt = sqliteDb.prepare(sql);
-    stmt.bind(params as unknown[]);
+    stmt.bind(params);
     const row = stmt.step() ? stmt.getAsObject() : undefined;
     stmt.free();
     return row as T | undefined;
   },
-  all<T = unknown>(sql: string, params?: unknown[]): T[] {
+  all<T = unknown>(sql: string, params?: BindParams): T[] {
     const stmt = sqliteDb.prepare(sql);
-    stmt.bind(params as unknown[]);
+    stmt.bind(params);
     const rows: T[] = [];
     while (stmt.step()) {
       rows.push(stmt.getAsObject() as T);
@@ -62,22 +63,22 @@ export const sqlite = {
   },
   prepare(sql: string) {
     return {
-      run: (...params: unknown[]) => {
+      run: (...params: BindParams[]) => {
         const stmt = sqliteDb.prepare(sql);
-        stmt.run(params);
+        stmt.run(params as unknown as BindParams);
         stmt.free();
         schedulePersist();
       },
-      get: <T = unknown>(...params: unknown[]): T | undefined => {
+      get: <T = unknown>(...params: BindParams[]): T | undefined => {
         const stmt = sqliteDb.prepare(sql);
-        stmt.bind(params);
+        stmt.bind(params as unknown as BindParams);
         const row = stmt.step() ? stmt.getAsObject() : undefined;
         stmt.free();
         return row as T | undefined;
       },
-      all: <T = unknown>(...params: unknown[]): T[] => {
+      all: <T = unknown>(...params: BindParams[]): T[] => {
         const stmt = sqliteDb.prepare(sql);
-        stmt.bind(params);
+        stmt.bind(params as unknown as BindParams);
         const rows: T[] = [];
         while (stmt.step()) rows.push(stmt.getAsObject() as T);
         stmt.free();

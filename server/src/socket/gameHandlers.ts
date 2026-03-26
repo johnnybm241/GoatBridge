@@ -6,6 +6,7 @@ import type { Card } from '@goatbridge/shared';
 import { getRoom, findSeatByUserId } from '../rooms/roomManager.js';
 import { emitToRoom, getSocketId } from './broadcaster.js';
 import { processBid, processCardPlay, startNewHand, validateClaimAllTricks, settleClaim } from '../game/stateMachine.js';
+import type { GameRoom } from '../game/stateMachine.js';
 import { scheduleAIActionIfNeeded } from '../ai/aiPlayer.js';
 import { sqlite } from '../db/index.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -704,8 +705,8 @@ function handlePairsBoardResult(
 
 function persistHand(
   roomCode: string,
-  game: NonNullable<ReturnType<typeof getRoom>['game']>,
-  contract: NonNullable<NonNullable<ReturnType<typeof getRoom>['game']>['contract']>,
+  game: NonNullable<GameRoom['game']>,
+  contract: NonNullable<NonNullable<GameRoom['game']>['contract']>,
   tricksMade: number,
 ): void {
   try {
