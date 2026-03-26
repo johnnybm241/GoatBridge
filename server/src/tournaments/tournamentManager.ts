@@ -29,6 +29,7 @@ export interface Tournament {
   boardResults: PairBoardResult[];
   standings: TournamentStanding[];
   createdAt: number;
+  scheduledStartAt?: number; // epoch ms — undefined = manual start
   // Server-only
   preDealtBoards: Array<Record<Seat, Card[]>>;
   paidEntries: PaidEntry[];
@@ -71,6 +72,7 @@ export function createTournament(
   totalBoards: number,
   boardsPerRound: number,
   entryFee = 0,
+  scheduledStartAt?: number,
 ): Tournament {
   let code = generateTournamentCode();
   while (tournaments.has(code)) code = generateTournamentCode();
@@ -89,6 +91,7 @@ export function createTournament(
     boardResults: [],
     standings: [],
     createdAt: Date.now(),
+    scheduledStartAt: scheduledStartAt && scheduledStartAt > Date.now() ? scheduledStartAt : undefined,
     preDealtBoards: [],
     paidEntries: [],
   };

@@ -20,6 +20,7 @@ export default function TournamentLobbyPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [countdown, setCountdown] = useState<string | null>(null);
 
   // Organizer: pair add form
   const [p1Search, setP1Search] = useState('');
@@ -71,6 +72,32 @@ export default function TournamentLobbyPage() {
       try { socket.emit('leave_tournament_lobby', { tournamentCode }); } catch { /* not connected */ }
     };
   }, [tournamentCode]);
+
+  // Live countdown for scheduled tournaments
+  useEffect(() => {
+    if (!tournament?.scheduledStartAt || tournament.status !== 'setup') {
+      setCountdown(null);
+      return;
+    }
+    const tick = () => {
+      const diff = tournament.scheduledStartAt! - Date.now();
+      if (diff <= 0) {
+        setCountdown('Starting soon…');
+        return;
+      }
+      const h = Math.floor(diff / 3_600_000);
+      const m = Math.floor((diff % 3_600_000) / 60_000);
+      const s = Math.floor((diff % 60_000) / 1_000);
+      setCountdown(
+        h > 0
+          ? `${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`
+          : `${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`,
+      );
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [tournament?.scheduledStartAt, tournament?.status]);
 
   const t = tournament;
   const isOrganizer = t?.organizerUserId === userId;
@@ -235,6 +262,22 @@ export default function TournamentLobbyPage() {
         {t.entryFee > 0 && <span className="text-gold font-semibold">{t.entryFee} 🐐 entry fee</span>}
         {t.entryFee === 0 && <span className="text-green-400/70">Free entry</span>}
       </div>
+
+      {/* Scheduled start banner */}
+      {t.scheduledStartAt && t.status === 'setup' && (
+        <div className="bg-blue-900/20 border border-blue-400/30 rounded-xl px-4 py-3 mb-5 flex items-center justify-between gap-4">
+          <div>
+            <div className="text-blue-300 text-sm font-semibold">🕐 Scheduled Start</div>
+            <div className="text-cream/60 text-xs mt-0.5">{new Date(t.scheduledStartAt).toLocaleString()}</div>
+          </div>
+          {countdown && (
+            <div className="text-right">
+              <div className="text-blue-300 font-mono text-lg font-bold">{countdown}</div>
+              <div className="text-cream/40 text-xs">until auto-start</div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── SETUP PHASE ── */}
       {t.status === 'setup' && isOrganizer && (
@@ -482,7 +525,11 @@ export default function TournamentLobbyPage() {
             </div>
           )}
 
-          <div className="text-center text-cream/30 text-xs py-2">Waiting for organizer to start the tournament…</div>
+          <div className="text-center text-cream/30 text-xs py-2">
+            {t.scheduledStartAt && countdown
+              ? `Auto-starts in ${countdown}`
+              : 'Waiting for organizer to start the tournament…'}
+          </div>
         </div>
       )}
 

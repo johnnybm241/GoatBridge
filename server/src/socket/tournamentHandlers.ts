@@ -60,7 +60,7 @@ export function setupTournamentHandlers(
     socket.leave(`tournament:${payload.tournamentCode}`);
   });
 
-  socket.on('create_tournament', (payload: { name: string; totalBoards: number; boardsPerRound: number; entryFee?: number }) => {
+  socket.on('create_tournament', (payload: { name: string; totalBoards: number; boardsPerRound: number; entryFee?: number; scheduledStartAt?: number }) => {
     if (!payload.name?.trim()) {
       socket.emit('room_error', { message: 'Tournament name is required' });
       return;
@@ -73,6 +73,7 @@ export function setupTournamentHandlers(
     const totalBoards = Number(payload.totalBoards) || 16;
     const boardsPerRound = Number(payload.boardsPerRound) || 4;
     const entryFee = Math.max(0, Math.floor(Number(payload.entryFee) || 0));
+    const scheduledStartAt = payload.scheduledStartAt ? Number(payload.scheduledStartAt) : undefined;
     if (totalBoards < 2 || totalBoards > 100) {
       socket.emit('room_error', { message: 'Total boards must be between 2 and 100' });
       return;
@@ -81,9 +82,13 @@ export function setupTournamentHandlers(
       socket.emit('room_error', { message: 'Boards per round must be between 2 and total boards' });
       return;
     }
-    const t = createTournament(userId, payload.name.trim(), totalBoards, boardsPerRound, entryFee);
+    if (scheduledStartAt && scheduledStartAt <= Date.now()) {
+      socket.emit('room_error', { message: 'Scheduled start time must be in the future' });
+      return;
+    }
+    const t = createTournament(userId, payload.name.trim(), totalBoards, boardsPerRound, entryFee, scheduledStartAt);
     socket.join(`tournament:${t.tournamentCode}`);
-    logger.info('Tournament created', { tournamentCode: t.tournamentCode, userId, name: t.name, totalBoards, boardsPerRound, entryFee });
+    logger.info('Tournament created', { tournamentCode: t.tournamentCode, userId, name: t.name, totalBoards, boardsPerRound, entryFee, scheduledStartAt });
     socket.emit('tournament_state', { tournament: toClientTournament(t) });
   });
 

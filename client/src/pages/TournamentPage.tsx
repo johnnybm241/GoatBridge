@@ -17,6 +17,7 @@ export default function TournamentPage() {
   const [totalBoards, setTotalBoards] = useState(16);
   const [boardsPerRound, setBoardsPerRound] = useState(4);
   const [entryFee, setEntryFee] = useState(0);
+  const [scheduledStart, setScheduledStart] = useState(''); // datetime-local string
   const [error, setError] = useState('');
   const setTournament = useTournamentStore(s => s.setTournament);
 
@@ -40,7 +41,8 @@ export default function TournamentPage() {
         setCreating(false);
         navigate(`/tournaments/${payload.tournament.tournamentCode}`);
       });
-      socket.emit('create_tournament', { name: name.trim(), totalBoards, boardsPerRound, entryFee });
+      const scheduledStartAt = scheduledStart ? new Date(scheduledStart).getTime() : undefined;
+      socket.emit('create_tournament', { name: name.trim(), totalBoards, boardsPerRound, entryFee, scheduledStartAt });
       setTimeout(() => setCreating(false), 5000);
     } catch {
       setError('Not connected. Please refresh.');
@@ -126,6 +128,23 @@ export default function TournamentPage() {
                 <p className="text-cream/40 text-xs mt-1">Players will be charged {entryFee} Goats to enter. Refunded automatically if the tournament is cancelled.</p>
               )}
             </div>
+            <div>
+              <label className="block text-cream/80 text-sm mb-1">
+                Scheduled Start <span className="text-cream/40 font-normal">(optional – leave blank for manual start)</span>
+              </label>
+              <input
+                type="datetime-local"
+                value={scheduledStart}
+                min={new Date(Date.now() + 60_000).toISOString().slice(0, 16)}
+                onChange={e => setScheduledStart(e.target.value)}
+                className="w-full bg-navy border border-gold/30 text-cream rounded-lg px-3 py-2 focus:outline-none focus:border-gold transition-colors text-sm [color-scheme:dark]"
+              />
+              {scheduledStart && (
+                <p className="text-cream/40 text-xs mt-1">
+                  Tournament will start automatically at the scheduled time. If fewer than 2 pairs have joined, it will be cancelled and entry fees refunded.
+                </p>
+              )}
+            </div>
             {totalBoards >= 2 && boardsPerRound >= 2 && (
               <p className="text-cream/40 text-xs">
                 {Math.ceil(totalBoards / boardsPerRound)} round{Math.ceil(totalBoards / boardsPerRound) !== 1 ? 's' : ''} estimated
@@ -166,6 +185,9 @@ export default function TournamentPage() {
                     : t.status === 'in_progress' ? 'text-green-400'
                     : 'text-cream/30'
                   }>{t.status === 'setup' ? 'Setup' : t.status === 'in_progress' ? 'In Progress' : 'Complete'}</span>
+                  {t.scheduledStartAt && t.status === 'setup' && (
+                    <span className="text-blue-400"> &middot; 🕐 {new Date(t.scheduledStartAt).toLocaleString()}</span>
+                  )}
                 </div>
               </div>
               <button

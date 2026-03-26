@@ -110,6 +110,7 @@ export interface CreateTournamentPayload {
   totalBoards: number;
   boardsPerRound: number;
   entryFee?: number;
+  scheduledStartAt?: number; // epoch ms — undefined = manual start
 }
 
 export interface JoinTournamentPayload {

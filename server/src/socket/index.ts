@@ -20,6 +20,7 @@ import { startNewHand } from '../game/stateMachine.js';
 import { scheduleAIActionIfNeeded } from '../ai/aiPlayer.js';
 import type { Tournament } from '../tournaments/tournamentManager.js';
 import { registerStartRoundFn, linkTableToTournament, toClientTournament } from '../tournaments/tournamentManager.js';
+import { startScheduler } from '../tournaments/tournamentScheduler.js';
 
 // In development allow any localhost port (Vite may pick 5174, 5175, etc.)
 // In production restrict to the explicit CLIENT_ORIGIN
@@ -153,6 +154,9 @@ export function createSocketServer(httpServer: HttpServer): Server {
     }
   };
   registerStartRoundFn(startTournamentRound);
+
+  // Background scheduler: auto-starts tournaments when their scheduledStartAt time arrives
+  startScheduler(io, startTournamentMatch);
 
   io.on('connection', (socket) => {
     const typedSocket = socket as typeof socket & { data: { userId: string; username: string } };

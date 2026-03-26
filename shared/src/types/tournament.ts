@@ -52,4 +52,5 @@ export interface TournamentState {
   boardResults: PairBoardResult[];
   standings: TournamentStanding[];
   createdAt: number;
+  scheduledStartAt?: number; // epoch ms, optional — null/undefined = manual start
 }
