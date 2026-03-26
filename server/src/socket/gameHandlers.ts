@@ -166,7 +166,7 @@ export function setupGameHandlers(
       });
 
       // Persist hand to DB
-      persistHand(room.roomCode, result.game, result.contract, result.tricksMade);
+      persistHand(room, result.game, result.contract, result.tricksMade);
       recordHandPlayed(room);
       handleTeamMatchBoardResult(io, room, handScore, result.game.handNumber, result.contract, result.tricksMade);
       handlePairsBoardResult(io, room, result.game.handNumber, result.contract, result.tricksMade);
@@ -324,7 +324,7 @@ function finishClaim(io: Server, roomCode: string, room: NonNullable<ReturnType<
     scores: result.game.scores,
     vulnerability: result.game.vulnerability,
   });
-  persistHand(roomCode, result.game, result.contract, result.tricksMade);
+  persistHand(room, result.game, result.contract, result.tricksMade);
   recordHandPlayed(room);
   handleTeamMatchBoardResult(io, room, handScore, result.game.handNumber, result.contract, result.tricksMade);
   handlePairsBoardResult(io, room, result.game.handNumber, result.contract, result.tricksMade);
@@ -463,7 +463,7 @@ export function handleAIPlay(io: Server, roomCode: string, seat: Seat, card: Car
       scores: result.game.scores,
       vulnerability: result.game.vulnerability,
     });
-    persistHand(room.roomCode, result.game, result.contract, result.tricksMade);
+    persistHand(room, result.game, result.contract, result.tricksMade);
     recordHandPlayed(room);
     handleTeamMatchBoardResult(io, room, handScore, result.game.handNumber, result.contract, result.tricksMade);
     handlePairsBoardResult(io, room, result.game.handNumber, result.contract, result.tricksMade);
@@ -773,11 +773,13 @@ function persistTournamentBoard(tournament: import('../tournaments/tournamentMan
 }
 
 function persistHand(
-  roomCode: string,
+  room: NonNullable<ReturnType<typeof getRoom>>,
   game: NonNullable<GameRoom['game']>,
   contract: NonNullable<NonNullable<GameRoom['game']>['contract']>,
   tricksMade: number,
 ): void {
+  const roomCode = room.roomCode;
+  const now = Date.now();
   try {
     const roomRecord = sqlite.get<{ id: string }>('SELECT id FROM rooms WHERE room_code = ?', [roomCode]);
     if (!roomRecord) return;
@@ -789,7 +791,44 @@ function persistHand(
         JSON.stringify(contract), contract.declarer, tricksMade,
         game.scores.nsBelowTotal + game.scores.nsAboveTotal,
         game.scores.ewBelowTotal + game.scores.ewAboveTotal,
-        Date.now(),
+        now,
+      ],
+    );
+  } catch {
+    // Non-fatal
+  }
+
+  // Persist full board detail to casual_boards for history review
+  try {
+    if (!room.originalHands) return;
+    const declarerSide: 'ns' | 'ew' =
+      (contract.declarer === 'north' || contract.declarer === 'south') ? 'ns' : 'ew';
+    const handScore = scoreHand(contract, tricksMade, game.vulnerability, declarerSide);
+    const nsRaw = (handScore.nsScoreBelow + handScore.nsScoreAbove) - (handScore.ewScoreBelow + handScore.ewScoreAbove);
+    sqlite.run(
+      `INSERT OR IGNORE INTO casual_boards
+        (id, room_code, hand_number, north_user_id, east_user_id, south_user_id, west_user_id,
+         dealer, vulnerability, deal_json, bidding_json, contract_json, declarer_seat,
+         tricks_made, ns_raw_score, play_json, played_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        uuidv4(),
+        roomCode,
+        game.handNumber,
+        game.seats.north.userId ?? null,
+        game.seats.east.userId ?? null,
+        game.seats.south.userId ?? null,
+        game.seats.west.userId ?? null,
+        game.dealer,
+        game.vulnerability,
+        JSON.stringify(room.originalHands),
+        JSON.stringify(game.bidding.calls),
+        JSON.stringify(contract),
+        contract.declarer,
+        tricksMade,
+        nsRaw,
+        JSON.stringify(game.completedTricks),
+        now,
       ],
     );
   } catch {

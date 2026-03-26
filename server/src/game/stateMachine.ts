@@ -46,6 +46,7 @@ export interface GameRoom {
   pairsNsPairId?: string | null;
   pairsEwPairId?: string | null;
   pairsPreDealtBoards?: Array<Record<Seat, Card[]>> | null;
+  originalHands?: Record<Seat, Card[]> | null; // snapshot of deal before cards are played
 }
 
 export function initGameState(room: GameRoom, dealer: Seat): GameState {
@@ -332,6 +333,13 @@ export function startNewHand(room: GameRoom, preDealt?: Record<Seat, Card[]>): {
 
   const newHands = preDealt ?? deal();
   room.hands = newHands;
+  // Snapshot the original deal (hands are mutated during play, this copy is preserved)
+  room.originalHands = {
+    north: [...newHands.north],
+    east: [...newHands.east],
+    south: [...newHands.south],
+    west: [...newHands.west],
+  };
   room.undoStack = []; // clear undo history between hands
 
   const newGame = initGameState(room, nextDealer);

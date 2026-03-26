@@ -212,6 +212,26 @@ export function runMigrations() {
     played_at INTEGER NOT NULL
   )`); } catch { /* already exists */ }
 
+  try { sqlite.exec(`CREATE TABLE IF NOT EXISTS casual_boards (
+    id TEXT PRIMARY KEY,
+    room_code TEXT NOT NULL,
+    hand_number INTEGER NOT NULL,
+    north_user_id TEXT,
+    east_user_id TEXT,
+    south_user_id TEXT,
+    west_user_id TEXT,
+    dealer TEXT NOT NULL,
+    vulnerability TEXT NOT NULL,
+    deal_json TEXT NOT NULL,
+    bidding_json TEXT NOT NULL,
+    contract_json TEXT NOT NULL,
+    declarer_seat TEXT NOT NULL,
+    tricks_made INTEGER NOT NULL,
+    ns_raw_score INTEGER NOT NULL,
+    play_json TEXT NOT NULL,
+    played_at INTEGER NOT NULL
+  )`); } catch { /* already exists */ }
+
   // Seed admin user
   try { sqlite.run('UPDATE users SET is_admin = 1, can_create_tournament = 1 WHERE username = ?', ['Johnnybm']); } catch { /* non-fatal */ }
 
