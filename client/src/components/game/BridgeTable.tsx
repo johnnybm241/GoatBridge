@@ -33,7 +33,6 @@ const SKIN_STYLES: Record<string, { bg: string; border: string; inner: string; s
   'forest':    { bg: '#052e16', border: '#15803d', inner: '#4ade80', symbol: '♣' },
 };
 
-/** Small text counter in the corner: "We 3 / They 2" */
 function TrickCounter({ ourTricks, theirTricks }: { ourTricks: number; theirTricks: number }) {
   return (
     <div className="flex gap-2 text-[10px] font-medium leading-none">
@@ -44,8 +43,6 @@ function TrickCounter({ ourTricks, theirTricks }: { ourTricks: number; theirTric
   );
 }
 
-/** Fanned row of face-down trick cards placed on the table in front of the bottom seat.
- *  Won tricks (by this side) = portrait; Lost tricks = landscape (rotated). */
 function TrickFan({
   completedTricks,
   yourSeat,
@@ -60,9 +57,9 @@ function TrickFan({
   const style = SKIN_STYLES[skin] ?? SKIN_STYLES['classic'];
   const isNS = !yourSeat || yourSeat === 'north' || yourSeat === 'south';
 
-  const CW = 36;      // portrait card width px
-  const CH = 52;      // portrait card height px
-  const OVERLAP = -16; // negative left margin for fanning
+  const CW = 28;
+  const CH = 40;
+  const OVERLAP = -12;
 
   return (
     <div className="flex items-end" style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.6))' }}>
@@ -112,19 +109,14 @@ function TrickFan({
   );
 }
 
-// Bridge play order is clockwise: N → E → S → W
-// But when sitting North facing South, East is to your LEFT and West to your RIGHT.
 const CLOCKWISE: Record<Seat, Seat> = { north: 'east', east: 'south', south: 'west', west: 'north' };
 const CCW: Record<Seat, Seat> = { north: 'west', west: 'south', south: 'east', east: 'north' };
 
-/** Returns seats mapped to table positions from the viewer's perspective. */
-function getSeatsFromPerspective(yourSeat: Seat | null): {
-  bottom: Seat; left: Seat; top: Seat; right: Seat;
-} {
+function getSeatsFromPerspective(yourSeat: Seat | null): { bottom: Seat; left: Seat; top: Seat; right: Seat } {
   const bottom: Seat = yourSeat ?? 'south';
-  const left = CLOCKWISE[bottom];   // clockwise neighbor is to your LEFT when facing partner
-  const top = CLOCKWISE[left];      // partner (opposite)
-  const right = CCW[bottom];        // counter-clockwise neighbor is to your RIGHT
+  const left = CLOCKWISE[bottom];
+  const top = CLOCKWISE[left];
+  const right = CCW[bottom];
   return { bottom, left, top, right };
 }
 
@@ -153,12 +145,7 @@ export default function BridgeTable({
 
   const isDeclarerTurn = currentTurn === dummy && yourSeat === declarer;
   const canPlayCard = isYourTurn || isDeclarerTurn;
-
-  const getHandForSeat = (seat: Seat): CardType[] => {
-    if (seat === yourSeat) return yourHand;
-    if (seat === dummy && dummyHand) return dummyHand;
-    return [];
-  };
+  const isNS = yourSeat === 'north' || yourSeat === 'south' || !yourSeat;
 
   const contractText = contract
     ? `${contract.level}${contract.strain === 'notrump' ? 'NT' : contract.strain[0]?.toUpperCase()}${contract.doubled === 'doubled' ? 'x' : contract.doubled === 'redoubled' ? 'xx' : ''} by ${contract.declarer}`
@@ -167,15 +154,15 @@ export default function BridgeTable({
   const nsTricks = trickCounts.ns;
   const ewTricks = trickCounts.ew;
 
-  const renderSeat = (seat: Seat, position: 'bottom' | 'top' | 'left' | 'right') => {
-    const isDummy = dummy === seat && phase === 'playing' && dummyHand;
-    const isBottom = position === 'bottom';
-    const isTop = position === 'top';
-    const isLeft = position === 'left';
+  const getHandForSeat = (seat: Seat): CardType[] => {
+    if (seat === yourSeat) return yourHand;
+    if (seat === dummy && dummyHand) return dummyHand;
+    return [];
+  };
 
+  const renderNameplate = (seat: Seat) => {
     const trickCount = (seat === 'north' || seat === 'south') ? nsTricks : ewTricks;
-
-    const nameplate = (
+    return (
       <SeatNameplate
         seat={seat}
         info={seats[seat]}
@@ -185,171 +172,158 @@ export default function BridgeTable({
         trickCount={trickCount}
       />
     );
+  };
 
+  const renderHandContent = (seat: Seat) => {
+    const isDummySeat = dummy === seat && phase === 'playing' && dummyHand;
     const handCards = getHandForSeat(seat);
-    const hand = isDummy ? (
-      <DummyHand
-        cards={dummyHand}
-        dummySeat={seat}
-        position={position}
-        onPlay={onPlay}
-        canPlay={canPlayCard && currentTurn === seat}
-        trumpSuit={contract && contract.strain !== 'notrump' ? contract.strain as CardType['suit'] : null}
-      />
-    ) : handCards.length > 0 ? (
-      <Hand
-        cards={handCards}
-        onPlay={onPlay}
-        isYourTurn={(seat === yourSeat ? isYourTurn : false) || (isDeclarerTurn && seat === dummy)}
-        size="lg"
-      />
-    ) : null;
 
-    if (isBottom) {
-      const bottomCls = phase === 'bidding' ? 'bottom-40 sm:bottom-0' : 'bottom-0';
+    if (isDummySeat) {
       return (
-        <div
-          key={seat}
-          className={`absolute ${bottomCls} left-1/2 -translate-x-1/2 flex flex-col-reverse items-center gap-1 z-10 pb-2 transition-all duration-200`}
-        >
-          {phase === 'playing' && completedTricks.length > 0 && (
-            <TrickFan completedTricks={completedTricks} yourSeat={yourSeat} skin={activeCardBackSkin} />
-          )}
-          {invalidCardMessage && (
-            <div className="text-red-400 text-xs font-bold bg-navy/80 rounded px-2 py-0.5 pointer-events-none">
-              {invalidCardMessage}
-            </div>
-          )}
-          {nameplate}
-          {hand}
-        </div>
+        <DummyHand
+          cards={dummyHand}
+          dummySeat={seat}
+          position="top"
+          onPlay={onPlay}
+          canPlay={canPlayCard && currentTurn === seat}
+          trumpSuit={contract && contract.strain !== 'notrump' ? contract.strain as CardType['suit'] : null}
+        />
       );
     }
-    if (isTop) {
+
+    if (handCards.length > 0) {
       return (
-        <div
-          key={seat}
-          className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 z-10"
-          style={{ top: '4%' }}
-        >
-          {nameplate}
-          {hand}
-        </div>
+        <Hand
+          cards={handCards}
+          onPlay={onPlay}
+          isYourTurn={(seat === yourSeat ? isYourTurn : false) || (isDeclarerTurn && seat === dummy)}
+          size="lg"
+        />
       );
     }
-    if (isLeft) {
-      return (
-        <div
-          key={seat}
-          className="absolute left-0 sm:left-2 top-1/2 -translate-y-1/2 flex items-center gap-1 sm:gap-2 z-10"
-        >
-          {nameplate}
-          {hand}
-        </div>
-      );
-    }
-    // right
-    return (
-      <div
-        key={seat}
-        className="absolute right-0 sm:right-2 top-1/2 -translate-y-1/2 flex flex-row-reverse items-center gap-1 sm:gap-2 z-10"
-      >
-        {nameplate}
-        {hand}
-      </div>
-    );
+
+    return null;
   };
 
   return (
-    <div className="relative w-full h-full felt-texture rounded-none sm:rounded-2xl overflow-hidden shadow-2xl border-0 sm:border-4 border-felt-dark/50 min-h-[480px] sm:min-h-[420px] md:min-h-[500px] lg:min-h-[560px]">
-      {/* Table oval */}
-      <div className="absolute inset-4 sm:inset-8 rounded-full border-2 border-felt-light/20 pointer-events-none" />
+    <div className="relative flex flex-col w-full h-full felt-texture rounded-none sm:rounded-2xl overflow-hidden shadow-2xl border-0 sm:border-4 border-felt-dark/50">
 
-      {/* Contract display */}
-      {contractText && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-navy/80 rounded px-3 py-1 text-gold text-sm font-bold border border-gold/30 z-10">
-          {contractText}
-        </div>
-      )}
+      {/* Table oval decoration */}
+      <div className="absolute inset-4 sm:inset-8 rounded-full border-2 border-felt-light/20 pointer-events-none z-0" />
 
-      {renderSeat(top, 'top')}
-      {renderSeat(left, 'left')}
-      {renderSeat(right, 'right')}
-      {renderSeat(bottom, 'bottom')}
-
-      {/* Center trick area */}
-      <div className="absolute" style={{ top: '30%', left: '30%', right: '30%', bottom: '30%' }}>
-        <TrickArea currentTrick={displayTrick} yourSeat={yourSeat} isStatic={showLastTrick} />
-      </div>
-
-      {/* Bottom-left controls: trick counter + last trick + undo */}
-      <div className="absolute bottom-2 left-2 z-20 flex flex-col items-start gap-1.5">
-        {phase === 'playing' && (() => {
-          const isNS = yourSeat === 'north' || yourSeat === 'south' || !yourSeat;
-          return <TrickCounter ourTricks={isNS ? nsTricks : ewTricks} theirTricks={isNS ? ewTricks : nsTricks} />;
-        })()}
-        {phase === 'playing' && lastTrick && (
-          <button
-            onMouseDown={() => setShowLastTrick(true)}
-            onMouseUp={() => setShowLastTrick(false)}
-            onMouseLeave={() => setShowLastTrick(false)}
-            onTouchStart={() => setShowLastTrick(true)}
-            onTouchEnd={() => setShowLastTrick(false)}
-            className="block text-cream/80 hover:text-cream border border-cream/40 hover:border-cream/70 rounded px-2 py-1 text-xs font-bold transition-colors select-none"
-          >
-            Last trick
-          </button>
-        )}
-        {(phase === 'playing' || phase === 'bidding') && yourSeat && !claimFromSeat && !undoFromSeat && (
-          <button
-            onClick={() => getSocket().emit('request_undo', { roomCode })}
-            className="flex items-center gap-1 text-cream/70 hover:text-cream border border-cream/30 hover:border-cream/60 rounded-lg px-3 py-2 text-xs font-bold transition-colors min-h-[34px]"
-          >
-            ↩ Undo
-          </button>
-        )}
-        {undoFromSeat && yourSeat && yourSeat === undoFromSeat && (
-          <div className="text-cream/60 text-xs font-bold">Waiting…</div>
-        )}
-      </div>
-
-      {/* Scoreboard */}
+      {/* Scoreboard — absolute top-right */}
       <div className="absolute top-1 right-1 sm:top-2 sm:right-2 z-20 scale-75 sm:scale-100 origin-top-right">
         <Scoreboard scores={scores} vulnerability={vulnerability} />
       </div>
 
-      {/* Auction history during bidding */}
-      {phase === 'bidding' && (
-        <div className="absolute z-10 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-          <AuctionHistory bidding={bidding} dealer={gameState.dealer} vulnerability={vulnerability} />
+      {/* Contract — absolute top-center */}
+      {contractText && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-navy/80 rounded px-3 py-1 text-gold text-sm font-bold border border-gold/30 z-10 whitespace-nowrap pointer-events-none">
+          {contractText}
         </div>
       )}
 
-      {/* Bidding box — always visible during bidding, disabled when not your turn */}
-      {phase === 'bidding' && (
-        <div className="absolute bottom-2 right-2 z-30 max-h-[38vh] sm:max-h-none overflow-y-auto">
-          <BiddingBox
-            biddingState={bidding}
-            onBid={onBid}
-            disabled={!isYourTurn}
-          />
+      {/* ── TOP SEAT ── */}
+      <div className="flex justify-center items-start pt-2 sm:pt-3 shrink-0 z-10">
+        <div className="flex flex-col items-center gap-0.5">
+          {renderNameplate(top)}
+          {renderHandContent(top)}
         </div>
-      )}
+      </div>
 
-      {/* Claim button — bottom right during play */}
-      {phase === 'playing' && yourSeat && (yourSeat === declarer || yourSeat === dummy) && !claimFromSeat && !undoFromSeat && (
-        <div className="absolute bottom-4 right-4 z-20">
+      {/* ── MIDDLE ROW: left | center | right ── */}
+      <div className="flex flex-1 items-center min-h-0 z-10 px-1 gap-1">
+        {/* Left seat */}
+        <div className="shrink-0 flex flex-col items-center gap-0.5">
+          {renderNameplate(left)}
+          {renderHandContent(left)}
+        </div>
+
+        {/* Center: auction history or trick area */}
+        <div className="flex-1 flex items-center justify-center min-h-0 overflow-hidden">
+          {phase === 'bidding' ? (
+            <AuctionHistory bidding={bidding} dealer={gameState.dealer} vulnerability={vulnerability} />
+          ) : (
+            <TrickArea currentTrick={displayTrick} yourSeat={yourSeat} isStatic={showLastTrick} />
+          )}
+        </div>
+
+        {/* Right seat */}
+        <div className="shrink-0 flex flex-col items-center gap-0.5">
+          {renderNameplate(right)}
+          {renderHandContent(right)}
+        </div>
+      </div>
+
+      {/* ── BOTTOM SEAT: trick fan + nameplate + hand ── */}
+      <div className="flex flex-col items-center shrink-0 z-10 gap-0.5 px-2 pt-1">
+        {invalidCardMessage && (
+          <div className="text-red-400 text-xs font-bold bg-navy/80 rounded px-2 py-0.5 pointer-events-none">
+            {invalidCardMessage}
+          </div>
+        )}
+        {phase === 'playing' && completedTricks.length > 0 && (
+          <TrickFan completedTricks={completedTricks} yourSeat={yourSeat} skin={activeCardBackSkin} />
+        )}
+        {renderNameplate(bottom)}
+        {renderHandContent(bottom)}
+      </div>
+
+      {/* ── BOTTOM BAR: controls left | bidding box / claim right ── */}
+      <div className="flex items-end justify-between shrink-0 px-2 pb-2 pt-1 gap-2 z-20">
+        {/* Left controls */}
+        <div className="flex flex-col items-start gap-1.5">
+          {phase === 'playing' && (
+            <TrickCounter ourTricks={isNS ? nsTricks : ewTricks} theirTricks={isNS ? ewTricks : nsTricks} />
+          )}
+          {phase === 'playing' && lastTrick && (
+            <button
+              onMouseDown={() => setShowLastTrick(true)}
+              onMouseUp={() => setShowLastTrick(false)}
+              onMouseLeave={() => setShowLastTrick(false)}
+              onTouchStart={() => setShowLastTrick(true)}
+              onTouchEnd={() => setShowLastTrick(false)}
+              className="block text-cream/80 hover:text-cream border border-cream/40 hover:border-cream/70 rounded px-2 py-1 text-xs font-bold transition-colors select-none"
+            >
+              Last trick
+            </button>
+          )}
+          {(phase === 'playing' || phase === 'bidding') && yourSeat && !claimFromSeat && !undoFromSeat && (
+            <button
+              onClick={() => getSocket().emit('request_undo', { roomCode })}
+              className="flex items-center gap-1 text-cream/70 hover:text-cream border border-cream/30 hover:border-cream/60 rounded-lg px-3 py-2 text-xs font-bold transition-colors min-h-[34px]"
+            >
+              ↩ Undo
+            </button>
+          )}
+          {undoFromSeat && yourSeat && yourSeat === undoFromSeat && (
+            <div className="text-cream/60 text-xs font-bold">Waiting…</div>
+          )}
+        </div>
+
+        {/* Right: bidding box (during bidding) or claim button (during play) */}
+        {phase === 'bidding' && (
+          <div className="max-h-[42vh] sm:max-h-none overflow-y-auto shrink-0">
+            <BiddingBox
+              biddingState={bidding}
+              onBid={onBid}
+              disabled={!isYourTurn}
+            />
+          </div>
+        )}
+        {phase === 'playing' && yourSeat && (yourSeat === declarer || yourSeat === dummy) && !claimFromSeat && !undoFromSeat && (
           <button
             onClick={() => getSocket().emit('request_claim', { roomCode })}
-            className="bg-navy/90 border border-gold/50 hover:border-gold text-gold font-bold px-4 py-2 rounded-lg transition-colors text-sm min-h-[40px] min-w-[90px] shadow-lg"
+            className="bg-navy/90 border border-gold/50 hover:border-gold text-gold font-bold px-4 py-2 rounded-lg transition-colors text-sm min-h-[40px] min-w-[90px] shadow-lg shrink-0"
           >
             Claim
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
+      {/* ── OVERLAYS ── */}
 
-      {/* Claim response overlay — opponents only */}
+      {/* Claim response (opponents) */}
       {claimFromSeat && yourSeat && yourSeat !== declarer && yourSeat !== dummy && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-navy/60">
           <div className="bg-navy border border-gold/40 rounded-2xl p-6 text-center shadow-2xl space-y-4 min-w-[260px]">
@@ -382,7 +356,7 @@ export default function BridgeTable({
         </div>
       )}
 
-      {/* Undo response overlay — everyone except the requester */}
+      {/* Undo response overlay */}
       {undoFromSeat && yourSeat && yourSeat !== undoFromSeat && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-navy/60">
           <div className="bg-navy border border-gold/40 rounded-2xl p-6 text-center shadow-2xl space-y-4 min-w-[260px]">
@@ -408,8 +382,7 @@ export default function BridgeTable({
         </div>
       )}
 
-
-      {/* Scoring overlay after hand completes */}
+      {/* Scoring overlay */}
       {phase === 'scoring' && lastHandResult && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-navy/70">
           <div className="bg-navy border border-gold/40 rounded-2xl p-6 text-center shadow-2xl space-y-3 min-w-[260px]">

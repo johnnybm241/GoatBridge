@@ -32,15 +32,15 @@ export default function DummyHand({ cards, position, onPlay, canPlay = false, tr
   }
 
   return (
-    <div className="flex gap-1">
+    <div className="flex gap-0.5 sm:gap-1">
       {suits.map(suit => (
         <div key={suit} className="flex flex-col items-center gap-0.5">
-          <span className={`text-xs font-bold ${suit === 'hearts' || suit === 'diamonds' ? 'text-red-500' : 'text-gray-800'}`}>
+          <span className={`text-[10px] sm:text-xs font-bold ${suit === 'hearts' || suit === 'diamonds' ? 'text-red-500' : 'text-gray-800'}`}>
             {SUIT_SYMBOLS[suit]}
           </span>
           <div className="flex flex-col">
             {bySuit[suit].map((card, i) => (
-              <div key={`${card.suit}-${card.rank}`} className={i > 0 ? '-mt-[38px] sm:-mt-[52px] md:-mt-[72px] lg:-mt-[88px] xl:-mt-[104px]' : ''} style={{ zIndex: i + 1 }}>
+              <div key={`${card.suit}-${card.rank}`} className={i > 0 ? '-mt-[34px] sm:-mt-[46px] md:-mt-[66px] lg:-mt-[82px] xl:-mt-[98px]' : ''} style={{ zIndex: i + 1 }}>
                 <Card
                   card={card}
                   size="lg"

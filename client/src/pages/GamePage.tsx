@@ -119,7 +119,7 @@ export default function GamePage() {
   }, [bleatsToast?.id]);
 
   return (
-    <div className="flex h-full gap-0 p-0 sm:gap-2 sm:p-2 md:gap-3 md:p-3 bg-navy">
+    <div className="flex h-full min-h-0 gap-0 p-0 sm:gap-2 sm:p-2 md:gap-3 md:p-3 bg-navy">
       {/* Main table */}
       <div className="flex-1 flex flex-col gap-2 md:gap-3 min-w-0">
         {/* Room code header */}

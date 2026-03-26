@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion';
 import type { Card as CardType } from '@goatbridge/shared';
 import { SUIT_SYMBOLS } from '@goatbridge/shared';
 
@@ -48,14 +47,14 @@ export default function Card({ card, onClick, playable = false, size = 'md', fac
   }
 
   return (
-    <motion.div
+    <div
       onClick={playable ? onClick : undefined}
-      whileHover={playable ? { y: -8, transition: { duration: 0.15 } } : undefined}
-      whileTap={playable ? { scale: 0.95 } : undefined}
       className={`
         ${sizeClass} rounded-lg card-shadow bg-cream border border-gray-200
         flex flex-col justify-between p-1 select-none
-        ${playable ? 'cursor-pointer hover:ring-2 hover:ring-gold' : ''}
+        ${playable
+          ? 'cursor-pointer hover:-translate-y-2 active:scale-95 transition-transform duration-150 hover:ring-2 hover:ring-gold'
+          : ''}
         ${className}
       `}
     >
@@ -64,6 +63,6 @@ export default function Card({ card, onClick, playable = false, size = 'md', fac
         <div className={cornerSuitSize}>{symbol}</div>
       </div>
       <div className={`${suitColor} text-center text-xs sm:text-sm md:text-base lg:text-lg leading-none`}>{symbol}</div>
-    </motion.div>
+    </div>
   );
 }
