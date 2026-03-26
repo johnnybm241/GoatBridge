@@ -7,6 +7,7 @@ import type {
   SwissRoundTable,
   PairBoardResult,
   TournamentStanding,
+  TournamentBoardRecord,
 } from '@goatbridge/shared';
 
 export interface PaidEntry {
@@ -30,6 +31,7 @@ export interface Tournament {
   standings: TournamentStanding[];
   createdAt: number;
   scheduledStartAt?: number; // epoch ms — undefined = manual start
+  completedBoards: TournamentBoardRecord[]; // past boards available for review
   // Server-only
   preDealtBoards: Array<Record<Seat, Card[]>>;
   paidEntries: PaidEntry[];
@@ -92,6 +94,7 @@ export function createTournament(
     standings: [],
     createdAt: Date.now(),
     scheduledStartAt: scheduledStartAt && scheduledStartAt > Date.now() ? scheduledStartAt : undefined,
+    completedBoards: [],
     preDealtBoards: [],
     paidEntries: [],
   };
@@ -131,7 +134,7 @@ export function removeEntryPayment(t: Tournament, pairId: string): number {
 }
 
 export function getOpenTournaments(): Tournament[] {
-  return [...tournaments.values()].filter(t => t.status !== 'complete');
+  return [...tournaments.values()].filter(t => t.status === 'setup' || t.status === 'in_progress');
 }
 
 export function addPair(

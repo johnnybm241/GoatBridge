@@ -4,7 +4,8 @@ import { useAuthStore } from '../store/authStore.js';
 import { useTournamentStore } from '../store/tournamentStore.js';
 import { getSocket } from '../socket.js';
 import api from '../api.js';
-import type { TournamentState, PairEntry, SwissRound } from '@goatbridge/shared';
+import type { TournamentState, PairEntry, SwissRound, TournamentBoardRecord } from '@goatbridge/shared';
+import BoardViewer from '../components/tournament/BoardViewer.js';
 
 interface SearchUser {
   id: string;
@@ -21,6 +22,7 @@ export default function TournamentLobbyPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [countdown, setCountdown] = useState<string | null>(null);
+  const [boardViewer, setBoardViewer] = useState<TournamentBoardRecord[] | null>(null);
 
   // Organizer: pair add form
   const [p1Search, setP1Search] = useState('');
@@ -98,6 +100,16 @@ export default function TournamentLobbyPage() {
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [tournament?.scheduledStartAt, tournament?.status]);
+
+  const handleViewBoards = async () => {
+    if (!tournamentCode) return;
+    try {
+      const res = await api.get<{ boards: TournamentBoardRecord[] }>(`/tournaments/${tournamentCode}/boards`);
+      setBoardViewer(res.data.boards);
+    } catch {
+      setBoardViewer([]);
+    }
+  };
 
   const t = tournament;
   const isOrganizer = t?.organizerUserId === userId;
@@ -243,14 +255,24 @@ export default function TournamentLobbyPage() {
             </div>
           </div>
         </div>
-        {myRoomCode && (
-          <button
-            onClick={() => navigate(`/game/${myRoomCode}`)}
-            className="bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30 rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
-          >
-            Go to My Table
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {t.completedBoards && t.completedBoards.length > 0 && (
+            <button
+              onClick={handleViewBoards}
+              className="bg-gold/10 hover:bg-gold/20 text-gold border border-gold/30 rounded-lg px-3 py-2 text-sm font-semibold transition-colors"
+            >
+              📋 Boards ({t.completedBoards.length})
+            </button>
+          )}
+          {myRoomCode && (
+            <button
+              onClick={() => navigate(`/game/${myRoomCode}`)}
+              className="bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30 rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
+            >
+              Go to My Table
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tournament info strip */}
@@ -654,9 +676,26 @@ export default function TournamentLobbyPage() {
                   {' '}with {t.standings[0].totalMatchpoints} matchpoints
                 </p>
               )}
+              {t.completedBoards && t.completedBoards.length > 0 && (
+                <button
+                  onClick={handleViewBoards}
+                  className="mt-4 bg-gold/10 hover:bg-gold/20 text-gold border border-gold/30 rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
+                >
+                  📋 Review All Boards ({t.completedBoards.length})
+                </button>
+              )}
             </div>
           )}
         </div>
+      )}
+
+      {/* Board viewer overlay */}
+      {boardViewer !== null && t && (
+        <BoardViewer
+          boards={boardViewer}
+          pairs={t.pairs}
+          onClose={() => setBoardViewer(null)}
+        />
       )}
     </div>
   );

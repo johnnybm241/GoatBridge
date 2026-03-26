@@ -27,6 +27,16 @@ router.get('/users/search', requireAuth, (req: AuthRequest, res: Response) => {
   res.json({ users });
 });
 
+// GET /tournaments/:code/boards - get completed board records for review
+router.get('/:code/boards', (req, res) => {
+  const t = getTournament(req.params.code);
+  if (!t) {
+    res.status(404).json({ error: 'Tournament not found' });
+    return;
+  }
+  res.json({ boards: t.completedBoards });
+});
+
 // GET /tournaments/:code - get single tournament
 router.get('/:code', (req, res) => {
   const t = getTournament(req.params.code);

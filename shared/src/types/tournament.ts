@@ -1,3 +1,7 @@
+import type { Card } from './card.js';
+import type { BidCall, Contract } from './bidding.js';
+import type { Trick, Seat } from './game.js';
+
 export interface PairEntry {
   pairId: string;
   player1: { userId: string; displayName: string };
@@ -38,6 +42,24 @@ export interface TournamentStanding {
   opponents: string[]; // pairIds already faced
 }
 
+/** Full record of a completed board — stored for review after play */
+export interface TournamentBoardRecord {
+  boardNumber: number;          // tournament-level 1-indexed board number
+  roundNumber: number;
+  tableIndex: number;
+  nsPairId: string;
+  ewPairId: string;
+  dealer: Seat;
+  vulnerability: string;
+  deal: Record<Seat, Card[]>;   // all four hands face-up
+  biddingCalls: Array<{ seat: string; call: BidCall }>;
+  contract: Contract;
+  declarerSeat: Seat;
+  tricksMade: number;
+  nsRawScore: number;           // positive = NS scored, negative = EW scored
+  completedTricks: Trick[];
+}
+
 export interface TournamentState {
   tournamentCode: string;
   name: string;
@@ -53,4 +75,5 @@ export interface TournamentState {
   standings: TournamentStanding[];
   createdAt: number;
   scheduledStartAt?: number; // epoch ms, optional — null/undefined = manual start
+  completedBoards: TournamentBoardRecord[]; // past boards available for review
 }

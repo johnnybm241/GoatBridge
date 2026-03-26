@@ -12,7 +12,7 @@ import { sqlite } from '../db/index.js';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../logger.js';
 import { getTeamMatchByRoom, recordBoardResult } from '../teamMatches/teamMatchManager.js';
-import type { HandScore, Contract } from '@goatbridge/shared';
+import type { HandScore, Contract, TournamentBoardRecord, Seat } from '@goatbridge/shared';
 import { scoreHand } from '../game/scoring.js';
 import {
   getTournamentByRoom,
@@ -661,6 +661,31 @@ function handlePairsBoardResult(
   io.to(`tournament:${tournament.tournamentCode}`).emit('tournament_updated', { tournament: toClientTournament(tournament) });
 
   table.boardsComplete++;
+
+  // Store completed board for post-game review
+  if (room.game && room.pairsPreDealtBoards) {
+    const boardIdx = table.boardsComplete - 1; // already incremented
+    const deal = room.pairsPreDealtBoards[boardIdx];
+    if (deal) {
+      const boardRecord: TournamentBoardRecord = {
+        boardNumber: tournamentBoardNumber,
+        roundNumber: tournamentLink.roundNumber,
+        tableIndex: tournamentLink.tableIndex,
+        nsPairId,
+        ewPairId,
+        dealer: room.game.dealer as Seat,
+        vulnerability: room.game.vulnerability,
+        deal: deal as Record<Seat, import('@goatbridge/shared').Card[]>,
+        biddingCalls: room.game.bidding.calls as Array<{ seat: string; call: import('@goatbridge/shared').BidCall }>,
+        contract,
+        declarerSeat: contract.declarer as Seat,
+        tricksMade,
+        nsRawScore: nsSigned,
+        completedTricks: room.game.completedTricks as import('@goatbridge/shared').Trick[],
+      };
+      tournament.completedBoards.push(boardRecord);
+    }
+  }
 
   const totalBoardsThisRound = round.boardEnd - round.boardStart + 1;
 
