@@ -7,7 +7,7 @@ export interface GoatRank {
 }
 
 export const GOAT_RANKS: GoatRank[] = [
-  { id: 'kid',           name: 'Kid',           minBleats: 0,    icon: '🐐',    color: '#9ca3af' },
+  { id: 'kid',           name: 'Rookie',        minBleats: 0,    icon: '🐐',    color: '#9ca3af' },
   { id: 'young-buck',    name: 'Young Buck',    minBleats: 100,  icon: '🐐',    color: '#6ee7b7' },
   { id: 'billy-goat',    name: 'Billy Goat',    minBleats: 300,  icon: '🐐',    color: '#93c5fd' },
   { id: 'nanny',         name: 'Nanny',         minBleats: 750,  icon: '🐐',    color: '#c084fc' },

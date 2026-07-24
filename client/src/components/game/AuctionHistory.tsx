@@ -1,11 +1,13 @@
-import type { BiddingState, BidCall, Vulnerability } from '@goatbridge/shared';
+import type { BiddingState, BidCall, Vulnerability, SeatInfo } from '@goatbridge/shared';
 import { SUIT_SYMBOLS } from '@goatbridge/shared';
 import type { Seat } from '@goatbridge/shared';
+import { explainBidAt } from '../../lib/bidExplainer.js';
 
 interface AuctionHistoryProps {
   bidding: BiddingState;
   dealer: Seat;
   vulnerability: Vulnerability;
+  seats?: Record<Seat, SeatInfo>;
 }
 
 function formatCall(call: BidCall): React.ReactNode {
@@ -38,15 +40,18 @@ function isVul(seat: Seat, vulnerability: Vulnerability): boolean {
   return false;
 }
 
-export default function AuctionHistory({ bidding, dealer, vulnerability }: AuctionHistoryProps) {
+export default function AuctionHistory({ bidding, dealer, vulnerability, seats }: AuctionHistoryProps) {
   const dealerCol = COLUMN_SEATS.indexOf(dealer);
 
-  // Build rows: pad the start so dealer lands in their column
-  const cells: Array<{ call: BidCall; seat: Seat } | null> = [];
+  // Build rows: pad the start so dealer lands in their column, and remember each cell's call index
+  const cells: Array<{ call: BidCall; seat: Seat; index: number } | null> = [];
   for (let i = 0; i < dealerCol; i++) cells.push(null);
-  for (const c of bidding.calls) cells.push(c);
+  for (let i = 0; i < bidding.calls.length; i++) {
+    const c = bidding.calls[i]!;
+    cells.push({ call: c.call, seat: c.seat as Seat, index: i });
+  }
 
-  const rows: Array<Array<{ call: BidCall; seat: Seat } | null>> = [];
+  const rows: Array<Array<{ call: BidCall; seat: Seat; index: number } | null>> = [];
   for (let i = 0; i < cells.length; i += 4) {
     rows.push(cells.slice(i, i + 4));
   }
@@ -69,9 +74,15 @@ export default function AuctionHistory({ bidding, dealer, vulnerability }: Aucti
             <tr key={ri}>
               {[0,1,2,3].map(ci => {
                 const cell = row[ci];
+                if (!cell) return <td key={ci} className="py-2 px-4 text-cream/90" />;
+                const title = explainBidAt(cell.index, bidding, cell.seat);
                 return (
-                  <td key={ci} className="py-2 px-4 text-cream/90">
-                    {cell ? formatCall(cell.call) : ''}
+                  <td
+                    key={ci}
+                    title={title}
+                    className="py-2 px-4 text-cream/90 cursor-help underline decoration-dotted decoration-gold/40 underline-offset-4"
+                  >
+                    {formatCall(cell.call)}
                   </td>
                 );
               })}
@@ -79,6 +90,7 @@ export default function AuctionHistory({ bidding, dealer, vulnerability }: Aucti
           ))}
         </tbody>
       </table>
+      <div className="text-cream/40 text-[10px] mt-2 text-center">Hover any bid for its SAYC meaning</div>
     </div>
   );
 }

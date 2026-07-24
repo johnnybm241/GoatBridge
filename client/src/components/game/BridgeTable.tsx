@@ -216,9 +216,9 @@ export default function BridgeTable({
         <Scoreboard scores={scores} vulnerability={vulnerability} />
       </div>
 
-      {/* Contract — absolute top-center */}
+      {/* Contract — absolute top-left (balances scoreboard on top-right) */}
       {contractText && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-navy/80 rounded px-3 py-1 text-gold text-sm font-bold border border-gold/30 z-10 whitespace-nowrap pointer-events-none">
+        <div className="absolute top-1 left-1 sm:top-2 sm:left-2 bg-navy/80 rounded px-3 py-1 text-gold text-sm font-bold border border-gold/30 z-10 whitespace-nowrap pointer-events-none">
           {contractText}
         </div>
       )}
@@ -240,9 +240,9 @@ export default function BridgeTable({
         </div>
 
         {/* Center: auction history or trick area */}
-        <div className="flex-1 flex items-center justify-center min-h-0 overflow-hidden">
+        <div className="relative flex-1 flex items-center justify-center min-h-0 overflow-hidden self-stretch">
           {phase === 'bidding' ? (
-            <AuctionHistory bidding={bidding} dealer={gameState.dealer} vulnerability={vulnerability} />
+            <AuctionHistory bidding={bidding} dealer={gameState.dealer} vulnerability={vulnerability} seats={seats} />
           ) : (
             <TrickArea currentTrick={displayTrick} yourSeat={yourSeat} isStatic={showLastTrick} />
           )}
@@ -308,6 +308,7 @@ export default function BridgeTable({
               biddingState={bidding}
               onBid={onBid}
               disabled={!isYourTurn}
+              yourSeat={yourSeat}
             />
           </div>
         )}

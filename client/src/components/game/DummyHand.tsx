@@ -21,7 +21,7 @@ const SUIT_ORDER: Record<Suit | 'notrump', Suit[]> = {
   notrump:  ['spades',   'hearts',   'clubs',    'diamonds'], // B R B R
 };
 
-export default function DummyHand({ cards, position, onPlay, canPlay = false, trumpSuit }: DummyHandProps) {
+export default function DummyHand({ cards, onPlay, canPlay = false, trumpSuit }: DummyHandProps) {
   const suits = SUIT_ORDER[trumpSuit ?? 'notrump'];
   const rankOrder = ['A', 'K', 'Q', 'J', '10', '9', '8', '7', '6', '5', '4', '3', '2'];
 
@@ -32,26 +32,46 @@ export default function DummyHand({ cards, position, onPlay, canPlay = false, tr
   }
 
   return (
-    <div className="flex gap-0.5 sm:gap-1">
-      {suits.map(suit => (
-        <div key={suit} className="flex flex-col items-center gap-0.5">
-          <span className={`text-[10px] sm:text-xs font-bold ${suit === 'hearts' || suit === 'diamonds' ? 'text-red-500' : 'text-gray-800'}`}>
-            {SUIT_SYMBOLS[suit]}
-          </span>
-          <div className="flex flex-col">
-            {bySuit[suit].map((card, i) => (
-              <div key={`${card.suit}-${card.rank}`} className={i > 0 ? '-mt-[34px] sm:-mt-[46px] md:-mt-[66px] lg:-mt-[82px] xl:-mt-[98px]' : ''} style={{ zIndex: i + 1 }}>
-                <Card
-                  card={card}
-                  size="lg"
-                  playable={canPlay}
-                  onClick={() => onPlay?.(card)}
-                />
-              </div>
-            ))}
+    <div className="flex flex-col gap-1 sm:gap-1.5">
+      {suits.map(suit => {
+        const suitCards = bySuit[suit];
+        const isRed = suit === 'hearts' || suit === 'diamonds';
+        return (
+          <div key={suit} className="flex items-center gap-1.5">
+            <span
+              className={`w-4 sm:w-5 text-sm sm:text-base font-bold shrink-0 text-center ${
+                isRed ? 'text-red-500' : 'text-cream'
+              }`}
+            >
+              {SUIT_SYMBOLS[suit]}
+            </span>
+            <div className="flex">
+              {suitCards.length === 0 ? (
+                <span className="text-cream/40 text-xs italic px-1">void</span>
+              ) : (
+                suitCards.map((card, i) => (
+                  <div
+                    key={`${card.suit}-${card.rank}`}
+                    className={
+                      i > 0
+                        ? '-ml-7 sm:-ml-9 md:-ml-12 lg:-ml-16 xl:-ml-[76px]'
+                        : ''
+                    }
+                    style={{ zIndex: i + 1 }}
+                  >
+                    <Card
+                      card={card}
+                      size="lg"
+                      playable={canPlay}
+                      onClick={() => onPlay?.(card)}
+                    />
+                  </div>
+                ))
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

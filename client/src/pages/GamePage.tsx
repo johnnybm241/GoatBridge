@@ -170,13 +170,13 @@ export default function GamePage() {
       {/* Drag handle */}
       <div
         onMouseDown={onDragStart}
-        className="hidden lg:flex items-center justify-center w-2 cursor-col-resize group shrink-0"
+        className="hidden md:flex items-center justify-center w-2 cursor-col-resize group shrink-0"
       >
         <div className="w-0.5 h-16 rounded-full bg-gold/20 group-hover:bg-gold/60 transition-colors" />
       </div>
 
       {/* Right sidebar — hidden on small screens */}
-      <div className="hidden lg:flex flex-col gap-3 shrink-0" style={{ width: sidebarWidth }}>
+      <div className="hidden md:flex flex-col gap-3 shrink-0" style={{ width: sidebarWidth }}>
         {isHost && (
           <HostAdminPanel
             roomCode={roomCode!}

@@ -233,7 +233,7 @@ export function runMigrations() {
   )`); } catch { /* already exists */ }
 
   // Seed admin user
-  try { sqlite.run('UPDATE users SET is_admin = 1, can_create_tournament = 1 WHERE username = ?', ['Johnnybm']); } catch { /* non-fatal */ }
+  try { sqlite.run("UPDATE users SET is_admin = 1, can_create_tournament = 1 WHERE lower(username) = 'johnnybm'"); } catch { /* non-fatal */ }
 
   console.log('Database migrations complete.');
 }

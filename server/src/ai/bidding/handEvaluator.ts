@@ -60,7 +60,7 @@ export function evaluateHand(hand: Card[]): HandEvaluation {
 }
 
 function isBalancedHand(shape: Record<Suit, number>): boolean {
-  const counts = Object.values(shape).sort();
+  const counts = Object.values(shape).sort((a, b) => b - a);
   const patterns = [
     [4, 3, 3, 3],
     [4, 4, 3, 2],

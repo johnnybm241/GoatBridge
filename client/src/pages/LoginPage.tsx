@@ -1,16 +1,26 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { useAuthStore } from '../store/authStore.js';
+import { useAuthStore, setRememberMe } from '../store/authStore.js';
 import { initSocket } from '../socket.js';
 import api from '../api.js';
 
+const REMEMBERED_USERNAME_KEY = 'goatbridge-remembered-username';
+const REMEMBERED_PASSWORD_KEY = 'goatbridge-remembered-password';
+
 export default function LoginPage() {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState(
+    () => (typeof window !== 'undefined' ? localStorage.getItem(REMEMBERED_USERNAME_KEY) ?? '' : ''),
+  );
+  const [password, setPassword] = useState(
+    () => (typeof window !== 'undefined' ? localStorage.getItem(REMEMBERED_PASSWORD_KEY) ?? '' : ''),
+  );
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMeState] = useState(
+    () => (typeof window !== 'undefined' ? localStorage.getItem(REMEMBERED_USERNAME_KEY) !== null : true),
+  );
   const navigate = useNavigate();
   const setAuth = useAuthStore(s => s.setAuth);
   const setSkillPoints = useAuthStore(s => s.setSkillPoints);
@@ -25,6 +35,14 @@ export default function LoginPage() {
     try {
       const res = await axios.post('/auth/login', { username, password });
       const { token, userId } = res.data as { token: string; userId: string; username: string };
+      if (rememberMe) {
+        localStorage.setItem(REMEMBERED_USERNAME_KEY, username);
+        localStorage.setItem(REMEMBERED_PASSWORD_KEY, password);
+      } else {
+        localStorage.removeItem(REMEMBERED_USERNAME_KEY);
+        localStorage.removeItem(REMEMBERED_PASSWORD_KEY);
+      }
+      setRememberMe(rememberMe);
       setAuth(token, userId, username);
       initSocket(token);
       // Load profile data on login
@@ -57,6 +75,7 @@ export default function LoginPage() {
               type="text"
               value={username}
               onChange={e => setUsername(e.target.value)}
+              autoComplete="username"
               className="w-full bg-navy border border-gold/30 text-cream rounded-lg px-3 py-2 focus:outline-none focus:border-gold transition-colors"
               required
             />
@@ -68,6 +87,7 @@ export default function LoginPage() {
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={e => setPassword(e.target.value)}
+                autoComplete="current-password"
                 className="w-full bg-navy border border-gold/30 text-cream rounded-lg px-3 py-2 pr-10 focus:outline-none focus:border-gold transition-colors"
                 required
               />
@@ -82,6 +102,15 @@ export default function LoginPage() {
             </div>
           </div>
           {error && <p className="text-red-400 text-sm">{error}</p>}
+          <label className="flex items-center gap-2 text-cream/70 text-sm select-none cursor-pointer">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={e => setRememberMeState(e.target.checked)}
+              className="accent-gold w-4 h-4"
+            />
+            Remember me
+          </label>
           <button
             type="submit"
             disabled={loading}

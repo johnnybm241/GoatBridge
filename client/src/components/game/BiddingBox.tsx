@@ -1,11 +1,13 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import type { BidCall, BiddingState, Strain } from '@goatbridge/shared';
+import type { BidCall, BiddingState, Strain, Seat } from '@goatbridge/shared';
 import { STRAIN_ORDER } from '@goatbridge/shared';
+import { explainBidAt } from '../../lib/bidExplainer.js';
 
 interface BiddingBoxProps {
   biddingState: BiddingState;
   onBid: (call: BidCall) => void;
   disabled?: boolean;
+  yourSeat?: Seat | null;
 }
 
 const STRAIN_DISPLAY: Record<Strain, { label: string; color: string }> = {
@@ -28,13 +30,22 @@ function isBidAvailable(level: number, strain: Strain, state: BiddingState): boo
   return false;
 }
 
-export default function BiddingBox({ biddingState, onBid, disabled = false }: BiddingBoxProps) {
+export default function BiddingBox({ biddingState, onBid, disabled = false, yourSeat = null }: BiddingBoxProps) {
   const canDouble = !disabled &&
     biddingState.currentBid !== null &&
     biddingState.doubleStatus === 'none';
 
   const canRedouble = !disabled &&
     biddingState.doubleStatus === 'doubled';
+
+  const preview = (call: BidCall): string | undefined => {
+    if (!yourSeat) return undefined;
+    const hypothetical: BiddingState = {
+      ...biddingState,
+      calls: [...biddingState.calls, { seat: yourSeat, call }],
+    };
+    return explainBidAt(hypothetical.calls.length - 1, hypothetical, yourSeat);
+  };
 
   return (
     <AnimatePresence>
@@ -63,10 +74,11 @@ export default function BiddingBox({ biddingState, onBid, disabled = false }: Bi
                   key={`${level}-${strain}`}
                   onClick={() => available && onBid({ type: 'bid', level, strain })}
                   disabled={!available}
+                  title={available ? preview({ type: 'bid', level, strain }) : undefined}
                   className={`
                     w-8 h-8 rounded text-xs font-bold transition-all
                     ${available
-                      ? 'bg-felt hover:bg-felt-light text-cream border border-felt-light hover:border-gold/50 hover:scale-105'
+                      ? 'bg-felt hover:bg-felt-light text-cream border border-felt-light hover:border-gold/50 hover:scale-105 cursor-help'
                       : 'bg-navy/30 text-cream/20 border border-transparent cursor-not-allowed'}
                   `}
                 >
@@ -82,21 +94,24 @@ export default function BiddingBox({ biddingState, onBid, disabled = false }: Bi
           <button
             onClick={() => !disabled && onBid({ type: 'pass' })}
             disabled={disabled}
-            className="py-1.5 rounded text-xs font-bold bg-green-800 hover:bg-green-700 text-cream border border-green-600 disabled:opacity-30 transition-colors"
+            title={!disabled ? preview({ type: 'pass' }) : undefined}
+            className="py-1.5 rounded text-xs font-bold bg-green-800 hover:bg-green-700 text-cream border border-green-600 disabled:opacity-30 transition-colors cursor-help disabled:cursor-not-allowed"
           >
             Pass
           </button>
           <button
             onClick={() => canDouble && onBid({ type: 'double' })}
             disabled={!canDouble}
-            className="py-1.5 rounded text-xs font-bold bg-red-900 hover:bg-red-800 text-cream border border-red-700 disabled:opacity-30 transition-colors"
+            title={canDouble ? preview({ type: 'double' }) : undefined}
+            className="py-1.5 rounded text-xs font-bold bg-red-900 hover:bg-red-800 text-cream border border-red-700 disabled:opacity-30 transition-colors cursor-help disabled:cursor-not-allowed"
           >
             Dbl
           </button>
           <button
             onClick={() => canRedouble && onBid({ type: 'redouble' })}
             disabled={!canRedouble}
-            className="py-1.5 rounded text-xs font-bold bg-blue-900 hover:bg-blue-800 text-cream border border-blue-700 disabled:opacity-30 transition-colors"
+            title={canRedouble ? preview({ type: 'redouble' }) : undefined}
+            className="py-1.5 rounded text-xs font-bold bg-blue-900 hover:bg-blue-800 text-cream border border-blue-700 disabled:opacity-30 transition-colors cursor-help disabled:cursor-not-allowed"
           >
             Rdbl
           </button>
