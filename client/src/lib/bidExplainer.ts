@@ -300,6 +300,19 @@ export function explainBidAt(
   // Doubles / redoubles have their own SAYC rules
   if (call.type === 'double') {
     const lastBid = [...calls.slice(0, index)].reverse().find(c => c.call.type === 'bid');
+    // Negative double: partner opened 1X, RHO overcalled, I doubled.
+    if (openingIdx >= 0 && isResponder && priorBidsBySeatBefore === 0 && lastBid) {
+      const lb = lastBid.call.type === 'bid' ? lastBid.call : null;
+      if (lb && lb.strain !== 'notrump' && lb.level <= 3 && opening && opening.level === 1) {
+        const openSuit = opening.strain;
+        const oppSuit = lb.strain;
+        const unbidMajors = (['hearts', 'spades'] as const).filter(m => m !== openSuit && m !== oppSuit);
+        const shape = unbidMajors.length === 2
+          ? '4-4 in the majors'
+          : `4+ ${STRAIN_NAME[unbidMajors[0] ?? 'hearts']}`;
+        return `Negative double: 6+ HCP (8+ at the 2-level), takeout showing ${shape}. Not penalty.`;
+      }
+    }
     if (lastBid && lastBid.call.type === 'bid' && (lastBid.call.strain === 'notrump' || lastBid.call.level >= 4)) {
       return 'Penalty double: expects to defeat the contract.';
     }

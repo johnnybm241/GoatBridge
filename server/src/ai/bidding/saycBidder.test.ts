@@ -446,3 +446,39 @@ describe('SAYC bidder — Gerber 4?', () => {
     expect(bid).toEqual({ type: 'bid', level: 4, strain: 'notrump' });
   });
 });
+
+describe('SAYC bidder — Negative Doubles', () => {
+  // Auction: 1D - (1S overcall) - ? by responder
+  const seq1D1S = (): BiddingState =>
+    makeBidding([
+      { seat: 'south', call: { type: 'bid', level: 1, strain: 'diamonds' } },
+      { seat: 'west',  call: { type: 'bid', level: 1, strain: 'spades' } },
+    ]);
+  // 1C - (1D) - ? by responder
+  const seq1C1D = (): BiddingState =>
+    makeBidding([
+      { seat: 'south', call: { type: 'bid', level: 1, strain: 'clubs' } },
+      { seat: 'west',  call: { type: 'bid', level: 1, strain: 'diamonds' } },
+    ]);
+
+  it('doubles 1D-(1S) with 4+ hearts, 6+ HCP', () => {
+    // A54 spades, KQ73 hearts, K54 diamonds, Q54 clubs ? 4+3+3+2=12 HCP, 4 hearts
+    const hand = makeHand({ spades: 'A54', hearts: 'KQ73', diamonds: 'K54', clubs: 'Q54' });
+    const bid = chooseBid(hand, 'north', seq1D1S());
+    expect(bid).toEqual({ type: 'double' });
+  });
+
+  it('doubles 1C-(1D) with both 4-card majors, 6+ HCP', () => {
+    // KJ54 spades, Q873 hearts, A54 diamonds, 54 clubs ? 3+2+4+0=9 HCP, 4-4 majors
+    const hand = makeHand({ spades: 'KJ54', hearts: 'Q873', diamonds: 'A54', clubs: '54' });
+    const bid = chooseBid(hand, 'north', seq1C1D());
+    expect(bid).toEqual({ type: 'double' });
+  });
+
+  it('does NOT negative-double with only 5 HCP', () => {
+    // Q54 spades, J873 hearts, 542 diamonds, 542 clubs ? 2+1+0+0=3 HCP
+    const hand = makeHand({ spades: 'Q54', hearts: 'J873', diamonds: '542', clubs: '542' });
+    const bid = chooseBid(hand, 'north', seq1D1S());
+    expect(bid).not.toEqual({ type: 'double' });
+  });
+});

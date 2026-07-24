@@ -11,7 +11,7 @@ const MINORS: Suit[] = ['clubs', 'diamonds'];
 type Role =
   | { kind: 'opening' }
   | { kind: 'overcaller-first'; opening: { seat: Seat; call: LevelBid } }
-  | { kind: 'responder-first'; opening: { seat: Seat; call: LevelBid } }
+  | { kind: 'responder-first'; opening: { seat: Seat; call: LevelBid }; interference: LevelBid | null }
   | { kind: 'advancer-first'; overcall: { seat: Seat; call: LevelBid }; opening: { seat: Seat; call: LevelBid } }
   | {
       kind: 'opener-rebid';
@@ -211,7 +211,14 @@ function classifyRole(seat: Seat, bidding: BiddingState): Role {
   }
 
   if (partnerOpened) {
-    if (myPriorBids === 0) return { kind: 'responder-first', opening: { seat: openerSeat, call: openingCall } };
+    if (myPriorBids === 0) {
+      // Detect RHO interference (any opp bid between opener's bid and me)
+      const interferenceEntry = calls
+        .slice(firstBidIdx + 1)
+        .find(c => c.seat !== seat && c.seat !== partnerSeat && c.call.type === 'bid');
+      const interference = interferenceEntry ? (interferenceEntry.call as LevelBid) : null;
+      return { kind: 'responder-first', opening: { seat: openerSeat, call: openingCall }, interference };
+    }
     // Responder rebid
     const response = partnersPriorBids[0]; // partner (opener) rebid — actually myPrior responses = my bids
     void response;
@@ -287,8 +294,40 @@ function openingBid(eval_: HandEvaluation): BidCall {
 // Responder's first bid
 // ────────────────────────────────────────────────────────────────────────────
 
-function responderFirst(eval_: HandEvaluation, opening: LevelBid): BidCall {
+function responderFirst(eval_: HandEvaluation, opening: LevelBid, interference: LevelBid | null = null): BidCall {
   const { hcp, shape, isBalanced, stoppers } = eval_;
+
+  // Negative Doubles: after 1X-(1Y or 2Y overcall) with a suit interference through 3♠,
+  // Dbl is takeout, showing 6+ HCP and unbid major(s).
+  if (interference && interference.strain !== 'notrump' && opening.strain !== 'notrump') {
+    const openSuit = opening.strain as Suit;
+    const oppSuit = interference.strain as Suit;
+    const isThroughThreeSpades =
+      interference.level <= 2 ||
+      (interference.level === 3 && ['clubs', 'diamonds', 'hearts', 'spades'].indexOf(oppSuit) <= 3);
+    if (isThroughThreeSpades && hcp >= 6) {
+      const unbidMajors = (['hearts', 'spades'] as Suit[]).filter(m => m !== openSuit && m !== oppSuit);
+      // 1m-(1♥)-Dbl = 4+ spades; 1♣-(1♦)-Dbl = 4-4 majors; 1m-(1♠)-Dbl = 4+ hearts
+      const majorsShown = unbidMajors.filter(m => shape[m] >= 4);
+      const needsBothMajors = openSuit !== 'hearts' && openSuit !== 'spades' && oppSuit !== 'hearts' && oppSuit !== 'spades';
+      if (needsBothMajors) {
+        if (shape.hearts >= 4 && shape.spades >= 4) return { type: 'double' };
+      } else if (unbidMajors.length === 1 && majorsShown.length === 1) {
+        // Higher HCP required for 2-level negative doubles (8+)
+        if (interference.level === 1 || (interference.level >= 2 && hcp >= 8)) {
+          return { type: 'double' };
+        }
+      } else if (unbidMajors.length === 2 && majorsShown.length >= 1) {
+        if (interference.level === 1 || hcp >= 8) return { type: 'double' };
+      }
+    }
+    // Raise partner's suit through interference
+    if (shape[openSuit] >= 3 && (openSuit === 'hearts' || openSuit === 'spades')) {
+      if (hcp >= 10 && shape[openSuit] >= 4) return { type: 'bid', level: 3, strain: openSuit };
+      if (hcp >= 6 && hcp <= 9) return { type: 'bid', level: 2, strain: openSuit };
+    }
+    // Otherwise fall through to normal logic (may pass if nothing else fits)
+  }
 
   // Response to 1NT (15-17 balanced)
   if (opening.strain === 'notrump' && opening.level === 1) {
@@ -915,7 +954,7 @@ export function chooseBid(
       chosen = openingBid(eval_);
       break;
     case 'responder-first':
-      chosen = responderFirst(eval_, role.opening.call);
+      chosen = responderFirst(eval_, role.opening.call, role.interference);
       break;
     case 'opener-rebid':
       chosen = openerRebid(eval_, role.opening, role.response);
