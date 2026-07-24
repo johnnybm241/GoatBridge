@@ -20,6 +20,13 @@ type Role =
       interference: boolean;
     }
   | {
+      kind: 'opener-second-rebid';
+      opening: LevelBid;
+      response: LevelBid | null;
+      myRebid: BidCall | null;
+      partnerLatest: BidCall | null;
+    }
+  | {
       kind: 'responder-rebid';
       opening: LevelBid;
       response: LevelBid;
@@ -65,8 +72,18 @@ function classifyRole(seat: Seat, bidding: BiddingState): Role {
             .findIndex(c => c.seat === partnerSeat && c.call.type === 'bid') > 0
         : false;
     if (myPriorBids === 1) return { kind: 'opener-rebid', opening: openingCall, response, interference };
-    // Later opener bids → treat similarly to opener-rebid (best effort)
-    return { kind: 'opener-rebid', opening: openingCall, response, interference };
+    // 2nd+ opener rebid: gather my prior rebid + partner's latest bid so we can handle NMF etc.
+    const myBids = calls.filter(c => c.seat === seat && c.call.type === 'bid');
+    const myRebid = myBids[1] ? myBids[1]!.call : null;
+    const partnerLatestEntry = [...calls].reverse().find(c => c.seat === partnerSeat && c.call.type === 'bid');
+    const partnerLatest = partnerLatestEntry ? partnerLatestEntry.call : null;
+    return {
+      kind: 'opener-second-rebid',
+      opening: openingCall,
+      response,
+      myRebid,
+      partnerLatest,
+    };
   }
 
   if (partnerOpened) {
@@ -256,8 +273,57 @@ function responderFirst(eval_: HandEvaluation, opening: LevelBid): BidCall {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Opener's rebid
+// New Minor Forcing (NMF) helpers
+//   Applies after:
+//     1m - 1M - 1NT  →  NMF = 2 of the other minor
+//     1m - 1M - 2NT  →  NMF = 3 of the other minor
+//   NMF is artificial and forcing to game (or invitational with 2NT rebid path).
+//   Asks opener to show 3-card support for responder's major or a 4-card other
+//   major, otherwise clarify shape (rebid own suit / NT).
 // ────────────────────────────────────────────────────────────────────────────
+
+interface NMFTrigger {
+  ask: LevelBid;
+  responderMajor: Suit; // hearts or spades
+  openerRebidLevel: 1 | 2; // 1NT rebid or 2NT rebid
+}
+
+function detectNMFTrigger(
+  opening: LevelBid,
+  response: LevelBid,
+  openerRebid: BidCall,
+): NMFTrigger | null {
+  if (openerRebid.type !== 'bid') return null;
+  if (openerRebid.strain !== 'notrump') return null;
+  if (openerRebid.level !== 1 && openerRebid.level !== 2) return null;
+  if (opening.strain !== 'clubs' && opening.strain !== 'diamonds') return null;
+  if (response.level !== 1) return null;
+  if (response.strain !== 'hearts' && response.strain !== 'spades') return null;
+  const newMinor: Suit = opening.strain === 'clubs' ? 'diamonds' : 'clubs';
+  const askLevel = openerRebid.level === 1 ? 2 : 3;
+  return {
+    ask: { type: 'bid', level: askLevel, strain: newMinor },
+    responderMajor: response.strain as Suit,
+    openerRebidLevel: openerRebid.level as 1 | 2,
+  };
+}
+
+/** Returns true if `partnerLatest` is the NMF ask consistent with this auction. */
+function isNMFAsk(
+  opening: LevelBid,
+  response: LevelBid | null,
+  myRebid: BidCall | null,
+  partnerLatest: BidCall | null,
+): NMFTrigger | null {
+  if (!response || !myRebid || !partnerLatest) return null;
+  if (myRebid.type !== 'bid' || partnerLatest.type !== 'bid') return null;
+  const trigger = detectNMFTrigger(opening, response, myRebid);
+  if (!trigger) return null;
+  if (partnerLatest.strain !== trigger.ask.strain) return null;
+  if (partnerLatest.level !== trigger.ask.level) return null;
+  return trigger;
+}
+
 
 function openerRebid(
   eval_: HandEvaluation,
@@ -383,8 +449,22 @@ function responderRebid(
   response: LevelBid,
   openerRebid: BidCall | null,
 ): BidCall {
-  const { hcp } = eval_;
+  const { hcp, shape } = eval_;
   if (!openerRebid || openerRebid.type !== 'bid') return { type: 'pass' };
+
+  // NMF: if opener rebid 1NT or 2NT and I have invitational+ values with major interest,
+  // bid the "new minor" to ask about 3-card support / 4-card other major.
+  const nmf = detectNMFTrigger(opening, response, openerRebid);
+  if (nmf) {
+    const other: Suit = nmf.responderMajor === 'hearts' ? 'spades' : 'hearts';
+    const has5CardOwnMajor = shape[nmf.responderMajor] >= 5;
+    const has4OtherMajor = shape[other] >= 4;
+    const invitationalOrBetter = nmf.openerRebidLevel === 1 ? hcp >= 10 : hcp >= 4;
+    if (invitationalOrBetter && (has5CardOwnMajor || has4OtherMajor)) {
+      return nmf.ask;
+    }
+  }
+
   // Very conservative: with a decent hand, raise NT rebid to game
   if (openerRebid.strain === 'notrump' && openerRebid.level === 1 && hcp >= 12) {
     return { type: 'bid', level: 3, strain: 'notrump' };
@@ -398,7 +478,51 @@ function responderRebid(
       return { type: 'bid', level: 4, strain: openerRebid.strain as Suit };
     }
   }
-  void opening; void response;
+  return { type: 'pass' };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Opener's 2nd rebid (3rd bid) — mainly used to answer NMF
+// ────────────────────────────────────────────────────────────────────────────
+
+function openerSecondRebid(
+  eval_: HandEvaluation,
+  opening: LevelBid,
+  response: LevelBid | null,
+  myRebid: BidCall | null,
+  partnerLatest: BidCall | null,
+): BidCall {
+  const { hcp, shape, isBalanced } = eval_;
+  const nmf = isNMFAsk(opening, response, myRebid, partnerLatest);
+  if (nmf && myRebid && myRebid.type === 'bid') {
+    const responderMajor = nmf.responderMajor;
+    const otherMajor: Suit = responderMajor === 'hearts' ? 'spades' : 'hearts';
+    const baseLevel = nmf.openerRebidLevel === 1 ? 2 : 3;
+    const isMax = nmf.openerRebidLevel === 1 ? hcp >= 14 : hcp >= 19;
+
+    // 1) 3-card support for responder's major → bid it (jump with max)
+    if (shape[responderMajor] >= 3) {
+      const level = isMax ? baseLevel + 1 : baseLevel;
+      return { type: 'bid', level, strain: responderMajor };
+    }
+    // 2) 4-card other major → show it (jump with max)
+    if (shape[otherMajor] >= 4) {
+      const level = isMax ? baseLevel + 1 : baseLevel;
+      return { type: 'bid', level, strain: otherMajor };
+    }
+    // 3) No major fit — sign off in NT (min) or jump to 3NT (max)
+    if (isBalanced) {
+      if (nmf.openerRebidLevel === 1) {
+        return { type: 'bid', level: isMax ? 3 : 2, strain: 'notrump' };
+      }
+      return { type: 'bid', level: 3, strain: 'notrump' };
+    }
+    // 4) 6+ card opening suit — rebid it
+    if (opening.strain !== 'notrump' && shape[opening.strain as Suit] >= 6) {
+      return { type: 'bid', level: baseLevel + 1, strain: opening.strain };
+    }
+    return { type: 'bid', level: baseLevel, strain: 'notrump' };
+  }
   return { type: 'pass' };
 }
 
@@ -518,6 +642,9 @@ export function chooseBid(
       break;
     case 'opener-rebid':
       chosen = openerRebid(eval_, role.opening, role.response);
+      break;
+    case 'opener-second-rebid':
+      chosen = openerSecondRebid(eval_, role.opening, role.response, role.myRebid, role.partnerLatest);
       break;
     case 'responder-rebid':
       chosen = responderRebid(eval_, role.opening, role.response, role.openerRebid);

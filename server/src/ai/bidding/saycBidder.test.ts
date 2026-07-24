@@ -229,3 +229,64 @@ describe('SAYC bidder — safety net', () => {
     // If not a bid, must be pass/double/redouble — all fine
   });
 });
+
+describe('SAYC bidder — New Minor Forcing (NMF)', () => {
+  // 1♣ – P – 1♠ – P – 1NT – P – ?  (responder's rebid)
+  const seq1C_P_1S_P_1NT_P = (): BiddingState =>
+    makeBidding([
+      { seat: 'south', call: { type: 'bid', level: 1, strain: 'clubs' } },
+      { seat: 'west', call: { type: 'pass' } },
+      { seat: 'north', call: { type: 'bid', level: 1, strain: 'spades' } },
+      { seat: 'east', call: { type: 'pass' } },
+      { seat: 'south', call: { type: 'bid', level: 1, strain: 'notrump' } },
+      { seat: 'east', call: { type: 'pass' } },
+    ]);
+
+  it('responder with 5-card major and invitational values bids 2♦ (NMF)', () => {
+    // AJ854=5, K73=3, 842=0, K54=3 → 11 HCP, 5-card spades
+    const hand = makeHand({ spades: 'AJ854', hearts: 'K73', diamonds: '842', clubs: 'K54' });
+    const bid = chooseBid(hand, 'north', seq1C_P_1S_P_1NT_P());
+    expect(bid).toEqual({ type: 'bid', level: 2, strain: 'diamonds' });
+  });
+
+  it('responder with 4-card other major and invitational values bids NMF', () => {
+    // K854=3, AJ54=5, 842=0, K54=3 → 11 HCP with 4-card hearts (other major)
+    const hand = makeHand({ spades: 'K854', hearts: 'AJ54', diamonds: '842', clubs: 'K54' });
+    const bid = chooseBid(hand, 'north', seq1C_P_1S_P_1NT_P());
+    expect(bid).toEqual({ type: 'bid', level: 2, strain: 'diamonds' });
+  });
+
+  // 1♣ – P – 1♠ – P – 1NT – P – 2♦ (NMF) – P – ?  (opener's answer)
+  const seqNMFAsk1C = (): BiddingState =>
+    makeBidding([
+      { seat: 'south', call: { type: 'bid', level: 1, strain: 'clubs' } },
+      { seat: 'west', call: { type: 'pass' } },
+      { seat: 'north', call: { type: 'bid', level: 1, strain: 'spades' } },
+      { seat: 'east', call: { type: 'pass' } },
+      { seat: 'south', call: { type: 'bid', level: 1, strain: 'notrump' } },
+      { seat: 'east', call: { type: 'pass' } },
+      { seat: 'north', call: { type: 'bid', level: 2, strain: 'diamonds' } },
+      { seat: 'east', call: { type: 'pass' } },
+    ]);
+
+  it('opener with 3-card support for responder’s major bids 2♠', () => {
+    // Q83=2, K73=3, K73=3, AJ854=5 → 13 HCP, 3 spades, 3-3-3-4
+    const hand = makeHand({ spades: 'Q83', hearts: 'K73', diamonds: 'K73', clubs: 'AJ854' });
+    const bid = chooseBid(hand, 'south', seqNMFAsk1C());
+    expect(bid).toEqual({ type: 'bid', level: 2, strain: 'spades' });
+  });
+
+  it('opener without 3-card spade support but with 4-card hearts bids 2♥', () => {
+    // 83=0, KJ73=4, Q73=2, AK85=7 → 13 HCP, 2 spades, 4 hearts, 2-4-3-4
+    const hand = makeHand({ spades: '83', hearts: 'KJ73', diamonds: 'Q73', clubs: 'AK85' });
+    const bid = chooseBid(hand, 'south', seqNMFAsk1C());
+    expect(bid).toEqual({ type: 'bid', level: 2, strain: 'hearts' });
+  });
+
+  it('opener with max (14) and 3-card support jumps to 3♠', () => {
+    // K83=3, QJ3=3, K7=3, AJ854=5 → 14 HCP, 3 spades, 3-3-2-5
+    const hand = makeHand({ spades: 'K83', hearts: 'QJ3', diamonds: 'K7', clubs: 'AJ854' });
+    const bid = chooseBid(hand, 'south', seqNMFAsk1C());
+    expect(bid).toEqual({ type: 'bid', level: 3, strain: 'spades' });
+  });
+});

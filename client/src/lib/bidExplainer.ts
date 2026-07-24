@@ -112,10 +112,65 @@ function explainOpenerRebid(
   return `Opener’s rebid ${level}${strain === 'notrump' ? 'NT' : STRAIN_NAME[strain]} — showing shape and strength beyond the opening.`;
 }
 
-function explainResponderRebid(call: BidCall): string {
+function explainResponderRebid(call: BidCall, opening?: LevelBid, response?: LevelBid, openerRebid?: BidCall): string {
   if (call.type === 'pass') return 'Responder passes: minimum, no game interest.';
   if (call.type !== 'bid') return 'Responder’s rebid.';
+  // NMF ask
+  if (opening && response && openerRebid) {
+    const nmf = detectNMFTriggerClient(opening, response, openerRebid);
+    if (nmf && call.strain === nmf.askStrain && call.level === nmf.askLevel) {
+      const majorSym = nmf.responderMajor === 'hearts' ? '♥' : '♠';
+      return `New Minor Forcing (NMF): artificial and forcing, invitational+. Asks partner for 3-card support in ${majorSym} or a 4-card other major; otherwise partner clarifies with a NT rebid.`;
+    }
+  }
   return `Responder’s rebid ${call.level}${call.strain === 'notrump' ? 'NT' : STRAIN_NAME[call.strain]}: further describes strength/shape based on opener’s rebid.`;
+}
+
+/**
+ * NMF trigger detection — mirrors the server bidder's `detectNMFTrigger`.
+ */
+function detectNMFTriggerClient(
+  opening: LevelBid,
+  response: LevelBid,
+  openerRebid: BidCall,
+): { askStrain: 'clubs' | 'diamonds'; askLevel: 2 | 3; responderMajor: 'hearts' | 'spades' } | null {
+  if (openerRebid.type !== 'bid') return null;
+  if (openerRebid.strain !== 'notrump') return null;
+  if (openerRebid.level !== 1 && openerRebid.level !== 2) return null;
+  if (opening.strain !== 'clubs' && opening.strain !== 'diamonds') return null;
+  if (response.level !== 1) return null;
+  if (response.strain !== 'hearts' && response.strain !== 'spades') return null;
+  const askStrain: 'clubs' | 'diamonds' = opening.strain === 'clubs' ? 'diamonds' : 'clubs';
+  return {
+    askStrain,
+    askLevel: openerRebid.level === 1 ? 2 : 3,
+    responderMajor: response.strain as 'hearts' | 'spades',
+  };
+}
+
+function explainNMFAnswer(
+  call: BidCall,
+  nmf: { askStrain: 'clubs' | 'diamonds'; askLevel: 2 | 3; responderMajor: 'hearts' | 'spades' },
+): string {
+  if (call.type === 'pass') return 'Pass in response to NMF is not standard — treat as showing nothing extra.';
+  if (call.type !== 'bid') return 'Answer to NMF.';
+  const other: 'hearts' | 'spades' = nmf.responderMajor === 'hearts' ? 'spades' : 'hearts';
+  const majorSym = nmf.responderMajor === 'hearts' ? '♥' : '♠';
+  const otherSym = other === 'hearts' ? '♥' : '♠';
+  const baseLevel = nmf.askLevel; // 2 or 3
+  if (call.strain === nmf.responderMajor) {
+    if (call.level === baseLevel) return `Shows 3-card support for ${majorSym} (minimum for the NT rebid).`;
+    if (call.level > baseLevel) return `Shows 3-card support for ${majorSym} with maximum values (jump-shift).`;
+  }
+  if (call.strain === other) {
+    if (call.level === baseLevel) return `Denies 3-card support for ${majorSym}, shows a 4-card ${otherSym} suit.`;
+    if (call.level > baseLevel) return `4-card ${otherSym} with maximum values (jump).`;
+  }
+  if (call.strain === 'notrump') {
+    if (call.level === 2) return `Minimum NT rebidder with no 3-card support and no 4-card ${otherSym}.`;
+    if (call.level === 3) return `Maximum NT rebidder with no 3-card support and no 4-card ${otherSym}.`;
+  }
+  return `Answer to NMF: shows ${call.level}${STRAIN_NAME[call.strain]}, further describing shape.`;
 }
 
 function explainOvercall(call: BidCall, opening: LevelBid): string {
@@ -261,10 +316,29 @@ export function explainBidAt(
       const responseBid = responsePartner && responsePartner.call.type === 'bid' ? responsePartner.call : null;
       return explainOpenerRebid(call, opening, responseBid);
     }
-    return `Opener’s further bid ${call.level}${call.strain === 'notrump' ? 'NT' : STRAIN_NAME[call.strain]}: refining the auction based on partner’s responses.`;
+    // Opener's 3rd+ bid — may be answering NMF
+    const myBids = calls.slice(0, index).filter(c => c.seat === seat && c.call.type === 'bid');
+    const myFirstRebid = myBids[1] ? myBids[1]!.call : null;
+    const partnerBids = calls.slice(0, index).filter(c => c.seat === openerPartner && c.call.type === 'bid');
+    const responseBid = partnerBids[0] && partnerBids[0]!.call.type === 'bid' ? (partnerBids[0]!.call as LevelBid) : null;
+    const partnerLatest = partnerBids[partnerBids.length - 1]?.call ?? null;
+    if (responseBid && myFirstRebid && partnerLatest) {
+      const nmf = detectNMFTriggerClient(opening, responseBid, myFirstRebid);
+      if (nmf && partnerLatest.type === 'bid' && partnerLatest.strain === nmf.askStrain && partnerLatest.level === nmf.askLevel) {
+        return explainNMFAnswer(call, nmf);
+      }
+    }
+    return `Opener’s further bid ${call.type === 'bid' ? call.level : ''}${call.type === 'bid' ? (call.strain === 'notrump' ? 'NT' : STRAIN_NAME[call.strain]) : ''}: refining the auction based on partner’s responses.`;
   }
 
   // Responder
   if (priorBidsBySeat === 0) return explainResponse(call, opening, true);
-  return explainResponderRebid(call);
+  // Responder rebid — pass opener rebid context for NMF detection
+  const myResponseEntry = calls.slice(0, index).find(c => c.seat === seat && c.call.type === 'bid');
+  const responseBid = myResponseEntry && myResponseEntry.call.type === 'bid' ? myResponseEntry.call : null;
+  const openerRebidEntry = calls
+    .slice(myResponseEntry ? calls.indexOf(myResponseEntry) + 1 : 0, index)
+    .find(c => c.seat === openerPartner && c.call.type === 'bid');
+  const openerRebidCall = openerRebidEntry ? openerRebidEntry.call : null;
+  return explainResponderRebid(call, opening, responseBid ?? undefined, openerRebidCall ?? undefined);
 }
