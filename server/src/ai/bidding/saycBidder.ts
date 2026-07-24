@@ -18,6 +18,7 @@ type Role =
       opening: LevelBid;
       response: LevelBid | null; // null if partner passed
       interference: boolean;
+      interferenceBid: LevelBid | null;
     }
   | {
       kind: 'opener-second-rebid';
@@ -195,7 +196,16 @@ function classifyRole(seat: Seat, bidding: BiddingState): Role {
             .slice(firstBidIdx + 1)
             .findIndex(c => c.seat === partnerSeat && c.call.type === 'bid') > 0
         : false;
-    if (myPriorBids === 1) return { kind: 'opener-rebid', opening: openingCall, response, interference };
+    if (myPriorBids === 1) {
+      // Interference between opener and partner's response (if response exists)
+      // OR between response and my rebid seat.
+      const callsAfterOpen = calls.slice(firstBidIdx + 1);
+      const oppBidBeforeMe = callsAfterOpen
+        .filter(c => c.seat !== seat && c.seat !== partnerSeat && c.call.type === 'bid')
+        .map(c => c.call as LevelBid);
+      const interferenceBid = oppBidBeforeMe.length > 0 ? oppBidBeforeMe[oppBidBeforeMe.length - 1]! : null;
+      return { kind: 'opener-rebid', opening: openingCall, response, interference, interferenceBid };
+    }
     // 2nd+ opener rebid: gather my prior rebid + partner's latest bid so we can handle NMF etc.
     const myBids = calls.filter(c => c.seat === seat && c.call.type === 'bid');
     const myRebid = myBids[1] ? myBids[1]!.call : null;
@@ -505,9 +515,30 @@ function openerRebid(
   eval_: HandEvaluation,
   opening: LevelBid,
   response: LevelBid | null,
+  interferenceBid: LevelBid | null = null,
 ): BidCall {
   const { hcp, totalPoints, shape, isBalanced, stoppers } = eval_;
   const openerSuit = opening.strain !== 'notrump' ? (opening.strain as Suit) : null;
+
+  // Support Double: after 1X - (P) - 1Y - (opp overcalls up to 2Y),
+  // opener's Dbl shows EXACTLY 3-card support for responder's suit.
+  if (response && response.strain !== 'notrump' && response.level === 1 && interferenceBid) {
+    const respSuit = response.strain as Suit;
+    const oppLevel = interferenceBid.level;
+    // Applies when opp overcall is at or below 2 of responder's suit
+    const strainRank = ['clubs', 'diamonds', 'hearts', 'spades'];
+    const oppOverBelow2Resp =
+      oppLevel === 1 ||
+      (oppLevel === 2 && strainRank.indexOf(interferenceBid.strain) < strainRank.indexOf(respSuit));
+    if (oppOverBelow2Resp && shape[respSuit] === 3) {
+      return { type: 'double' };
+    }
+    // With 4-card support, raise instead
+    if (shape[respSuit] >= 4) {
+      if (totalPoints >= 16) return maybeLegal({ type: 'bid', level: 3, strain: respSuit }, { calls: [], currentBid: interferenceBid, doubleStatus: 'none', passCount: 0, isComplete: false, passedOut: false });
+      return maybeLegal({ type: 'bid', level: 2, strain: respSuit }, { calls: [], currentBid: interferenceBid, doubleStatus: 'none', passCount: 0, isComplete: false, passedOut: false });
+    }
+  }
 
   // Partner passed → auction is essentially over. Pass unless super strong.
   if (!response) return { type: 'pass' };
@@ -957,7 +988,7 @@ export function chooseBid(
       chosen = responderFirst(eval_, role.opening.call, role.interference);
       break;
     case 'opener-rebid':
-      chosen = openerRebid(eval_, role.opening, role.response);
+      chosen = openerRebid(eval_, role.opening, role.response, role.interferenceBid);
       break;
     case 'opener-second-rebid':
       chosen = openerSecondRebid(eval_, role.opening, role.response, role.myRebid, role.partnerLatest);

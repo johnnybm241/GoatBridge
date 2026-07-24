@@ -482,3 +482,28 @@ describe('SAYC bidder — Negative Doubles', () => {
     expect(bid).not.toEqual({ type: 'double' });
   });
 });
+
+describe('SAYC bidder — Support Doubles', () => {
+  // 1D - (P) - 1H - (1S overcall) - ? by opener
+  const seqSupport = (): BiddingState =>
+    makeBidding([
+      { seat: 'south', call: { type: 'bid', level: 1, strain: 'diamonds' } },
+      { seat: 'west',  call: { type: 'pass' } },
+      { seat: 'north', call: { type: 'bid', level: 1, strain: 'hearts' } },
+      { seat: 'east',  call: { type: 'bid', level: 1, strain: 'spades' } },
+    ]);
+
+  it('opener doubles with EXACTLY 3-card support for responder', () => {
+    // A54 spades, K73 hearts (3), KQ54 diamonds, AJ4 clubs ? 4+3+5+4=16 HCP, 3 hearts
+    const hand = makeHand({ spades: 'A54', hearts: 'K73', diamonds: 'KQ54', clubs: 'AJ4' });
+    const bid = chooseBid(hand, 'south', seqSupport());
+    expect(bid).toEqual({ type: 'double' });
+  });
+
+  it('opener raises with 4+ card support (not support-double)', () => {
+    // A54 spades, K873 hearts (4), KQ4 diamonds, AJ4 clubs ? 4+3+5+4=16 HCP, 4 hearts
+    const hand = makeHand({ spades: 'A54', hearts: 'K873', diamonds: 'KQ4', clubs: 'AJ4' });
+    const bid = chooseBid(hand, 'south', seqSupport());
+    expect(bid).not.toEqual({ type: 'double' });
+  });
+});

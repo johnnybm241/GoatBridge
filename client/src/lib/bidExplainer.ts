@@ -313,6 +313,27 @@ export function explainBidAt(
         return `Negative double: 6+ HCP (8+ at the 2-level), takeout showing ${shape}. Not penalty.`;
       }
     }
+    // Support double: opener's 2nd call is Dbl after 1X-P-1Y-(overcall).
+    if (openingIdx >= 0 && isOpener && priorBidsBySeatBefore === 1 && opening) {
+      const responderBid = calls
+        .slice(openingIdx + 1, index)
+        .find(c => c.seat === partnerOf(seat) && c.call.type === 'bid');
+      const respCall = responderBid && responderBid.call.type === 'bid' ? responderBid.call : null;
+      if (respCall && respCall.level === 1 && respCall.strain !== 'notrump') {
+        return `Support double: shows EXACTLY 3-card support for ${STRAIN_NAME[respCall.strain]}. With 4+ support, opener raises directly instead.`;
+      }
+    }
+    // Responsive double: (1X) - Dbl (partner's takeout) - (2X raise) - Dbl.
+    if (isDefensive && priorBidsBySeatBefore === 0 && opening) {
+      const partnerDbl = calls.slice(openingIdx + 1, index)
+        .some(c => c.seat === partnerOf(seat) && c.call.type === 'double');
+      const oppRaise = calls.slice(openingIdx + 1, index)
+        .filter(c => c.call.type === 'bid')
+        .some(c => c.call.type === 'bid' && c.call.strain === opening.strain && c.call.level >= 2);
+      if (partnerDbl && oppRaise) {
+        return `Responsive double: 6+ HCP takeout; no clear suit to bid. Asks partner to pick from the unbid suits (typically the unbid majors).`;
+      }
+    }
     if (lastBid && lastBid.call.type === 'bid' && (lastBid.call.strain === 'notrump' || lastBid.call.level >= 4)) {
       return 'Penalty double: expects to defeat the contract.';
     }
