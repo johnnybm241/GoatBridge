@@ -358,7 +358,7 @@ describe('SAYC bidder â€” Jacoby 2NT', () => {
   });
 });
 
-describe('SAYC bidder — Blackwood 4NT', () => {
+describe('SAYC bidder ï¿½ Blackwood 4NT', () => {
   // Auction: 1S - P - 3S - P - 4NT (Blackwood by opener)
   // North (responder/partner) must answer aces.
   const seqAfter4NT = (): BiddingState =>
@@ -412,7 +412,7 @@ describe('SAYC bidder — Blackwood 4NT', () => {
   });
 });
 
-describe('SAYC bidder — Gerber 4?', () => {
+describe('SAYC bidder ï¿½ Gerber 4?', () => {
   // 1NT - P - 4C (Gerber) - P - ?
   const seqAfterGerber = (): BiddingState =>
     makeBidding([
@@ -447,7 +447,7 @@ describe('SAYC bidder — Gerber 4?', () => {
   });
 });
 
-describe('SAYC bidder — Negative Doubles', () => {
+describe('SAYC bidder ï¿½ Negative Doubles', () => {
   // Auction: 1D - (1S overcall) - ? by responder
   const seq1D1S = (): BiddingState =>
     makeBidding([
@@ -483,7 +483,7 @@ describe('SAYC bidder — Negative Doubles', () => {
   });
 });
 
-describe('SAYC bidder — Support Doubles', () => {
+describe('SAYC bidder ï¿½ Support Doubles', () => {
   // 1D - (P) - 1H - (1S overcall) - ? by opener
   const seqSupport = (): BiddingState =>
     makeBidding([
@@ -505,5 +505,90 @@ describe('SAYC bidder — Support Doubles', () => {
     const hand = makeHand({ spades: 'A54', hearts: 'K873', diamonds: 'KQ4', clubs: 'AJ4' });
     const bid = chooseBid(hand, 'south', seqSupport());
     expect(bid).not.toEqual({ type: 'double' });
+  });
+});
+
+// -----------------------------------------------------------------------------
+// End-to-end auction smoke tests: walk full sequences with 4 hands and verify
+// each bot's call is exactly what the convention says. This proves the pieces
+// wire together the same way aiPlayer.ts drives them in a live game.
+// -----------------------------------------------------------------------------
+
+function playAuction(
+  hands: Record<Seat, Card[]>,
+  dealer: Seat = 'south',
+  maxRounds = 12,
+): Array<{ seat: Seat; call: BidCall }> {
+  const order: Seat[] = ['south', 'west', 'north', 'east'];
+  let idx = order.indexOf(dealer);
+  const calls: Array<{ seat: Seat; call: BidCall }> = [];
+  for (let i = 0; i < maxRounds * 4; i++) {
+    const seat = order[idx % 4]!;
+    const state = makeBidding(calls);
+    // Stop if auction is complete (3 passes after a bid, or 4 passes)
+    if (calls.length >= 4) {
+      const lastFour = calls.slice(-4);
+      const bidsInLast4 = lastFour.filter(c => c.call.type === 'bid').length;
+      const passesInLast3 = calls.slice(-3).filter(c => c.call.type === 'pass').length;
+      if (state.currentBid && passesInLast3 === 3) break;
+      if (calls.length === 4 && bidsInLast4 === 0) break;
+    }
+    const call = chooseBid(hands[seat], seat, state);
+    calls.push({ seat, call });
+    idx++;
+  }
+  return calls;
+}
+
+describe('SAYC bidder ï¿½ end-to-end auctions (live path)', () => {
+  it('Jacoby 2NT full sequence: 1S - 2NT - 3S(extras) - 4NT(Blackwood) - 5X - 6S', () => {
+    // South opens 1S with 15+ HCP balanced, no shortness ? forced to Jacoby 2NT answer 3S
+    // North has 4-card S support + 13 HCP ? Jacoby 2NT (2NT)
+    // Then North with 16+ TP after 3S extras ? Blackwood 4NT
+    const hands: Record<Seat, Card[]> = {
+      south: makeHand({ spades: 'AQJ84', hearts: 'K73', diamonds: 'K73', clubs: 'AJ4' }), // 18 HCP, 5-3-3-2
+      north: makeHand({ spades: 'KT32', hearts: 'AJ5', diamonds: 'AK2', clubs: 'A43' }), // 19 HCP, 4 spades â†’ Blackwood after 3S extras
+      west:  makeHand({ spades: '5', hearts: 'J982', diamonds: '9854', clubs: 'Q987' }),
+      east:  makeHand({ spades: '976', hearts: 'Q104', diamonds: 'J106', clubs: 'K1062' }),
+    };
+    const auction = playAuction(hands, 'south');
+    // First 3 bidder calls in order (skip passes by W/E)
+    const bidCalls = auction.filter(c => c.call.type === 'bid').map(c => ({ seat: c.seat, ...(c.call as LevelBid) }));
+    // Expect: south 1S, north 2NT, south 3S (extras), north 4NT (Blackwood), south 5X (aces)
+    expect(bidCalls[0]).toMatchObject({ seat: 'south', level: 1, strain: 'spades' });
+    expect(bidCalls[1]).toMatchObject({ seat: 'north', level: 2, strain: 'notrump' });
+    expect(bidCalls[2]).toMatchObject({ seat: 'south', level: 3, strain: 'spades' });
+    expect(bidCalls[3]).toMatchObject({ seat: 'north', level: 4, strain: 'notrump' });
+    // South has 3 aces (A?, K?, K?, A?) actually: A? + A? = 2 aces ? 5H
+    expect(bidCalls[4]).toMatchObject({ seat: 'south', level: 5, strain: 'hearts' });
+  });
+
+  it('Negative Double full sequence: 1D - (1S) - Dbl - (P) - 2H by opener', () => {
+    const hands: Record<Seat, Card[]> = {
+      south: makeHand({ spades: '5', hearts: 'AJ82', diamonds: 'AKJ83', clubs: 'K43' }), // 15 HCP, 4H, 5D
+      north: makeHand({ spades: 'A54', hearts: 'KQ73', diamonds: 'Q54', clubs: '983' }), // 12 HCP, 4H
+      west:  makeHand({ spades: 'KQJ97', hearts: '54', diamonds: '76', clubs: 'QJT6' }), // 9 HCP, 5S â†’ 1S overcall
+      east:  makeHand({ spades: 'Q1062', hearts: '1096', diamonds: '1092', clubs: 'AJ7' }),
+    };
+    const auction = playAuction(hands, 'south');
+    // S opens 1D, W overcalls 1S, N should double (negative, 4+ hearts)
+    expect(auction[0]).toEqual({ seat: 'south', call: { type: 'bid', level: 1, strain: 'diamonds' } });
+    expect(auction[1]).toEqual({ seat: 'west',  call: { type: 'bid', level: 1, strain: 'spades' } });
+    expect(auction[2]).toEqual({ seat: 'north', call: { type: 'double' } });
+  });
+
+  it('Support Double full sequence: 1D - (P) - 1H - (1S) - Dbl by opener with 3H', () => {
+    const hands: Record<Seat, Card[]> = {
+      south: makeHand({ spades: '54', hearts: 'K73', diamonds: 'KQJ854', clubs: 'KJ4' }), // 15 HCP, 2-3-6-2 unbal, exactly 3H â†’ opens 1D
+      north: makeHand({ spades: '9832', hearts: 'AQT85', diamonds: '3', clubs: 'A92' }), // 14 HCP, 5H
+      west:  makeHand({ spades: 'AT', hearts: 'J962', diamonds: 'A62', clubs: 'T743' }),  // weak, passes
+      east:  makeHand({ spades: 'KQJ76', hearts: '4', diamonds: 'T97', clubs: 'Q865' }), // 8 HCP, 5S â†’ 1S overcall
+    };
+    const auction = playAuction(hands, 'south');
+    expect(auction[0]).toEqual({ seat: 'south', call: { type: 'bid', level: 1, strain: 'diamonds' } });
+    expect(auction[1]).toEqual({ seat: 'west',  call: { type: 'pass' } });
+    expect(auction[2]).toEqual({ seat: 'north', call: { type: 'bid', level: 1, strain: 'hearts' } });
+    expect(auction[3]).toEqual({ seat: 'east',  call: { type: 'bid', level: 1, strain: 'spades' } });
+    expect(auction[4]).toEqual({ seat: 'south', call: { type: 'double' } });
   });
 });

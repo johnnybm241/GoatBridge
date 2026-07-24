@@ -405,8 +405,7 @@ function responderFirst(eval_: HandEvaluation, opening: LevelBid, interference: 
       // that we'd rather show first. Priority over 4M raise (allows slam try).
       if (
         shape[openerSuit] >= 4 &&
-        hcp >= 13 &&
-        hcp <= 17 // above 17 → consider Splinter (not implemented) or slower approach
+        hcp >= 13 // Jacoby 2NT is unlimited on top: any GF major raise with 4+ trump
       ) {
         return { type: 'bid', level: 2, strain: 'notrump' };
       }
