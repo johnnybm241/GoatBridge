@@ -186,10 +186,21 @@ export function explainBidAt(
   const isResponder = openerPartner && seat === openerPartner;
   const isDefensive = !isOpener && !isResponder;
 
+  // Count how many level bids this seat has already made before `index`
+  const priorBidsBySeatBefore = calls
+    .slice(0, index)
+    .filter(c => c.seat === seat && c.call.type === 'bid').length;
+
   // Pre-opening / early passes
   if (call.type === 'pass') {
     if (openingIdx < 0 || index < openingIdx) return 'Pass: fewer than 12 HCP (or no biddable hand).';
     if (index === calls.length - 1 && bidding.passCount >= 3) return 'Pass: ends the auction.';
+    // Seat has already bid — pass now means "nothing more to say", not a weak hand
+    if (priorBidsBySeatBefore > 0) {
+      if (isOpener) return 'Opener passes: minimum opening, nothing more to describe.';
+      if (isResponder) return 'Responder passes: has already limited the hand; no reason to bid again.';
+      return 'Pass: has already described the hand; no reason to bid again.';
+    }
     if (isOpener) return 'Opener passes: minimum, no more to say.';
     if (isResponder) return 'Responder passes: 0–5 HCP, no fit and no bid available.';
     return 'Defensive pass.';
@@ -214,12 +225,8 @@ export function explainBidAt(
     return `Bid ${call.level}${call.strain === 'notrump' ? 'NT' : STRAIN_NAME[call.strain]}.`;
   }
 
-  // How many times has this seat already bid a level bid?
-  let priorBidsBySeat = 0;
-  for (let i = 0; i < index; i++) {
-    const e = calls[i]!;
-    if (e.seat === seat && e.call.type === 'bid') priorBidsBySeat++;
-  }
+  // Alias earlier count for downstream logic
+  const priorBidsBySeat = priorBidsBySeatBefore;
 
   if (isDefensive) {
     const partnerSeat = partnerOf(seat);
