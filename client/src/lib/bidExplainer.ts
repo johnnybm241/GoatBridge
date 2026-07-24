@@ -309,6 +309,21 @@ export function explainBidAt(
   }
   if (call.type === 'redouble') return 'Redouble: 10+ HCP, generally strength-showing (or SOS depending on context).';
 
+  // 4th Suit Forcing: responder's 2-of-4th-suit after 1X-1Y-1Z is artificial GF.
+  {
+    const priorLevelBids = calls.slice(0, index).filter(c => c.call.type === 'bid');
+    if (priorLevelBids.length === 3 && call.type === 'bid' && call.level === 2 && call.strain !== 'notrump') {
+      const [b1, b2, b3] = priorLevelBids.map(c => c.call as LevelBid);
+      if (b1 && b2 && b3 && b1.level === 1 && b2.level === 1 && b3.level === 1
+          && b1.strain !== 'notrump' && b2.strain !== 'notrump' && b3.strain !== 'notrump') {
+        const bidSuits = new Set([b1.strain, b2.strain, b3.strain]);
+        if (!bidSuits.has(call.strain)) {
+          return `4th suit forcing: artificial, game-forcing (12+ HCP). Asks partner to describe further — bid NT with a stopper in ${STRAIN_NAME[call.strain]}, rebid a 6-card suit, or raise responder's suit with 3-card support.`;
+        }
+      }
+    }
+  }
+
   if (!opening) {
     return `Bid ${call.level}${call.strain === 'notrump' ? 'NT' : STRAIN_NAME[call.strain]}.`;
   }

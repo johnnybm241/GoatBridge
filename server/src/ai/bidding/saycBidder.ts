@@ -627,8 +627,36 @@ function responderRebid(
   response: LevelBid,
   openerRebid: BidCall | null,
 ): BidCall {
-  const { hcp, totalPoints, shape } = eval_;
+  const { hcp, totalPoints, shape, isBalanced, stoppers } = eval_;
   if (!openerRebid || openerRebid.type !== 'bid') return { type: 'pass' };
+
+  // 4th Suit Forcing (GF): 1X-1Y-1Z pattern. If I have 12+ HCP with no fit
+  // and no natural bid, bid the 4th (unbid) suit at the 2-level.
+  if (
+    opening.level === 1 && opening.strain !== 'notrump' &&
+    response.level === 1 && response.strain !== 'notrump' &&
+    openerRebid.level === 1 && openerRebid.strain !== 'notrump'
+  ) {
+    const bidSuits = new Set<Suit>([
+      opening.strain as Suit,
+      response.strain as Suit,
+      openerRebid.strain as Suit,
+    ]);
+    const fourthSuit = SUITS.find(s => !bidSuits.has(s));
+    if (fourthSuit && hcp >= 12) {
+      const openerRebidSuit = openerRebid.strain as Suit;
+      const responseSuit = response.strain as Suit;
+      const openerSuit = opening.strain as Suit;
+      // Check if there's already a natural rebid available: 3-card support for
+      // opener's rebid major, a 6-card own suit, or balanced with NT bid
+      const hasOpenerMajorSupport =
+        (openerRebidSuit === 'hearts' || openerRebidSuit === 'spades') && shape[openerRebidSuit] >= 3;
+      const hasLongOwnSuit = shape[responseSuit] >= 6;
+      if (!hasOpenerMajorSupport && !hasLongOwnSuit && shape[openerSuit] < 3) {
+        return { type: 'bid', level: 2, strain: fourthSuit };
+      }
+    }
+  }
 
   // Blackwood ask: opener raised our major (or agreed a fit) and we have slam-try values.
   const openerRaisedMyMajor =
@@ -688,7 +716,44 @@ function openerSecondRebid(
   myRebid: BidCall | null,
   partnerLatest: BidCall | null,
 ): BidCall {
-  const { hcp, shape, isBalanced } = eval_;
+  const { hcp, shape, isBalanced, stoppers } = eval_;
+
+  // 4SF answer: partner bid the 4th suit at 2-level over my 1-level rebid → GF.
+  // Describe: 3-card support for partner's major → raise; 6-card own suit → rebid;
+  // stopper in 4SF suit → NT; else 2-level 3-card raise of partner's suit or nothing.
+  if (
+    opening.level === 1 && opening.strain !== 'notrump' &&
+    response && response.level === 1 && response.strain !== 'notrump' &&
+    myRebid && myRebid.type === 'bid' && myRebid.level === 1 && myRebid.strain !== 'notrump' &&
+    partnerLatest && partnerLatest.type === 'bid' && partnerLatest.level === 2
+  ) {
+    const bidSuits = new Set<Suit>([
+      opening.strain as Suit,
+      response.strain as Suit,
+      myRebid.strain as Suit,
+    ]);
+    const isFourthSuit = !bidSuits.has(partnerLatest.strain as Suit) && partnerLatest.strain !== 'notrump';
+    if (isFourthSuit) {
+      const responderSuit = response.strain as Suit;
+      const fourthSuit = partnerLatest.strain as Suit;
+      const openerSuit = opening.strain as Suit;
+      // 1) 3+ card support for responder's major → raise it
+      if ((responderSuit === 'hearts' || responderSuit === 'spades') && shape[responderSuit] >= 3) {
+        return { type: 'bid', level: hcp >= 15 ? 3 : 2, strain: responderSuit };
+      }
+      // 2) Stopper in 4SF suit + balanced → NT
+      if (stoppers && shape[fourthSuit] >= 2) {
+        return { type: 'bid', level: hcp >= 15 ? 3 : 2, strain: 'notrump' };
+      }
+      // 3) 6-card opening suit → rebid it
+      if (shape[openerSuit] >= 6) {
+        return { type: 'bid', level: hcp >= 15 ? 3 : 2, strain: openerSuit };
+      }
+      // 4) Default fallback: NT (deny stopper, but game force)
+      return { type: 'bid', level: 2, strain: 'notrump' };
+    }
+  }
+
   const nmf = isNMFAsk(opening, response, myRebid, partnerLatest);
   if (nmf && myRebid && myRebid.type === 'bid') {
     const responderMajor = nmf.responderMajor;
