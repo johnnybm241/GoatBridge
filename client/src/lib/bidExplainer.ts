@@ -64,7 +64,7 @@ function explainResponse(call: BidCall, opening: LevelBid, byPartner: boolean): 
   if (strain === openStrain && openStrain !== 'notrump') {
     if (level === 2) return `Simple raise: 6–10 HCP, 3+ card support in ${STRAIN_NAME[strain]}.`;
     if (level === 3) return `Limit raise: 10–12 HCP, 4+ card support in ${STRAIN_NAME[strain]}.`;
-    if (level === 4) return `Game raise: 5+ card support, distributional or 13+ HCP with fit.`;
+    if (level === 4) return `Preemptive game raise: 5+ card support, under 10 HCP with distributional values. (Strong game-forcing raises use Jacoby 2NT.)`;
   }
   if (strain === 'notrump') {
     if (level === 1) return '1NT response: 6–10 HCP, no fit; forcing one round over 1♥/1♠.';

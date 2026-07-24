@@ -361,11 +361,15 @@ function responderFirst(eval_: HandEvaluation, opening: LevelBid): BidCall {
       ) {
         return { type: 'bid', level: 2, strain: 'notrump' };
       }
-      // Raises
-      if (shape[openerSuit] >= 3) {
-        if (hcp >= 13 && hcp <= 15) return { type: 'bid', level: 4, strain: openerSuit }; // game with fit (or use splinter — omitted)
-        if (hcp >= 10 && shape[openerSuit] >= 4) return { type: 'bid', level: 3, strain: openerSuit }; // limit raise
-        if (hcp >= 6 && hcp <= 9) return { type: 'bid', level: 2, strain: openerSuit }; // simple raise
+      // Raises (standard SAYC: 2M=6-10 w/ 3+, 3M=10-12 w/ 4+, 4M=<13 w/ 5+)
+      if (shape[openerSuit] >= 5 && hcp < 10) {
+        return { type: 'bid', level: 4, strain: openerSuit }; // preemptive game raise
+      }
+      if (shape[openerSuit] >= 4 && hcp >= 10 && hcp <= 12) {
+        return { type: 'bid', level: 3, strain: openerSuit }; // limit raise
+      }
+      if (shape[openerSuit] >= 3 && hcp >= 6 && hcp <= 9) {
+        return { type: 'bid', level: 2, strain: openerSuit }; // simple raise
       }
       // New suit at 1-level (spades over 1H) with 4+
       if (openerSuit === 'hearts' && shape.spades >= 4 && hcp >= 6)
