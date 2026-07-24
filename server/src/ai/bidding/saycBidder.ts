@@ -228,6 +228,15 @@ function responderFirst(eval_: HandEvaluation, opening: LevelBid): BidCall {
     if (hcp < 6) return { type: 'pass' };
 
     if (isMajorOpen) {
+      // Jacoby 2NT: 4+ trump support, 13+ HCP, no void/singleton in a side suit
+      // that we'd rather show first. Priority over 4M raise (allows slam try).
+      if (
+        shape[openerSuit] >= 4 &&
+        hcp >= 13 &&
+        hcp <= 17 // above 17 → consider Splinter (not implemented) or slower approach
+      ) {
+        return { type: 'bid', level: 2, strain: 'notrump' };
+      }
       // Raises
       if (shape[openerSuit] >= 3) {
         if (hcp >= 13 && hcp <= 15) return { type: 'bid', level: 4, strain: openerSuit }; // game with fit (or use splinter — omitted)
@@ -357,6 +366,51 @@ function openerRebid(
 
   // Opener rebids after 1-of-a-suit opening
   if (opening.level !== 1 || !openerSuit) return { type: 'pass' };
+
+  // Jacoby 2NT answer: partner bid 2NT after our 1M — GF raise, 4+ trumps, 13+ HCP.
+  // Canonical answers (Karen Walker):
+  //   3-of-a-side-suit (below 4M) = singleton or void in that suit
+  //   4-of-a-side-suit (below 4M) = 5-card second suit, no shortness
+  //   3NT = 12-14 balanced, no shortness, no side suit
+  //   3M (rebid own suit at 3) = 15+ HCP no shortness, slam interest
+  //   4M = 12-14, no shortness, no side suit (minimum)
+  const isMajorOpen = openerSuit === 'hearts' || openerSuit === 'spades';
+  if (isMajorOpen && response.strain === 'notrump' && response.level === 2) {
+    // 1) Shortness in a side suit (singleton or void)?
+    const sideSuits: Suit[] = SUITS.filter(s => s !== openerSuit);
+    for (const s of sideSuits) {
+      if (shape[s] <= 1) {
+        // Must be bid at a level <= 3 (below 4M). All 3-level sides are legal.
+        const strainIdx = ['clubs', 'diamonds', 'hearts', 'spades'].indexOf(s);
+        const openerIdx = ['clubs', 'diamonds', 'hearts', 'spades'].indexOf(openerSuit);
+        // If side suit is higher-ranked than opener's major, bidding it at 3 exceeds 3M — skip
+        if (strainIdx > openerIdx) continue;
+        return { type: 'bid', level: 3, strain: s };
+      }
+    }
+    // 2) 5-card side suit (no shortness) → show it at the 4-level (below or at game)
+    for (const s of sideSuits) {
+      if (shape[s] >= 5) {
+        const strainIdx = ['clubs', 'diamonds', 'hearts', 'spades'].indexOf(s);
+        const openerIdx = ['clubs', 'diamonds', 'hearts', 'spades'].indexOf(openerSuit);
+        if (strainIdx < openerIdx) {
+          return { type: 'bid', level: 4, strain: s };
+        }
+        // Higher-ranked side suit than opener's major would push past 4M; skip
+      }
+    }
+    // 3) Balanced no-shortness distinctions
+    if (hcp >= 15) {
+      // Extras with slam interest — rebid own suit at 3
+      return { type: 'bid', level: 3, strain: openerSuit };
+    }
+    if (isBalanced && hcp >= 12 && hcp <= 14) {
+      // 3NT shows 12-14 balanced, no side interest
+      return { type: 'bid', level: 3, strain: 'notrump' };
+    }
+    // Fallback: minimum, no shortness, no side suit → 4M
+    return { type: 'bid', level: 4, strain: openerSuit };
+  }
 
   // Partner raised our suit (simple raise 2M or limit raise 3M or game 4M)
   if (response.strain === openerSuit) {

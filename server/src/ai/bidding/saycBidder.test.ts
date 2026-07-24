@@ -290,3 +290,70 @@ describe('SAYC bidder — New Minor Forcing (NMF)', () => {
     expect(bid).toEqual({ type: 'bid', level: 3, strain: 'spades' });
   });
 });
+
+describe('SAYC bidder — Jacoby 2NT', () => {
+  // 1♠ – P – ?  (responder's first bid)
+  const open1S = (): BiddingState =>
+    makeBidding([
+      { seat: 'south', call: { type: 'bid', level: 1, strain: 'spades' } },
+      { seat: 'west', call: { type: 'pass' } },
+    ]);
+
+  it('responder with 4+ trump support and 13+ HCP bids 2NT (Jacoby)', () => {
+    // KQ54=5, A73=4, KJ4=4, 542=0 → 13 HCP, 4-card spades support
+    const hand = makeHand({ spades: 'KQ54', hearts: 'A73', diamonds: 'KJ4', clubs: '542' });
+    const bid = chooseBid(hand, 'north', open1S());
+    expect(bid).toEqual({ type: 'bid', level: 2, strain: 'notrump' });
+  });
+
+  it('responder with only 3-card support and 13 HCP does NOT bid Jacoby 2NT', () => {
+    // K54=3, AQ73=6, KJ4=4, 542=0 → 13 HCP but only 3 spades
+    const hand = makeHand({ spades: 'K54', hearts: 'AQ73', diamonds: 'KJ4', clubs: '542' });
+    const bid = chooseBid(hand, 'north', open1S());
+    expect(bid).not.toEqual({ type: 'bid', level: 2, strain: 'notrump' });
+  });
+
+  // 1♠ – P – 2NT (Jacoby) – P – ?  (opener's answer)
+  const seqJacoby1S = (): BiddingState =>
+    makeBidding([
+      { seat: 'south', call: { type: 'bid', level: 1, strain: 'spades' } },
+      { seat: 'west', call: { type: 'pass' } },
+      { seat: 'north', call: { type: 'bid', level: 2, strain: 'notrump' } },
+      { seat: 'east', call: { type: 'pass' } },
+    ]);
+
+  it('opener with a club singleton shows shortness with 3♣', () => {
+    // AQJ84=8, K73=3, A542=4, 5=0 → 15 HCP, 5-3-4-1 with singleton club
+    const hand = makeHand({ spades: 'AQJ84', hearts: 'K73', diamonds: 'A542', clubs: '5' });
+    const bid = chooseBid(hand, 'south', seqJacoby1S());
+    expect(bid).toEqual({ type: 'bid', level: 3, strain: 'clubs' });
+  });
+
+  it('opener with a diamond singleton shows shortness with 3♦', () => {
+    // AQJ84=8, KJ73=4, 5=0, A542=4 → 16 HCP, 5-4-1-3 with singleton diamond
+    const hand = makeHand({ spades: 'AQJ84', hearts: 'KJ73', diamonds: '5', clubs: 'A542' });
+    const bid = chooseBid(hand, 'south', seqJacoby1S());
+    expect(bid).toEqual({ type: 'bid', level: 3, strain: 'diamonds' });
+  });
+
+  it('opener with balanced 15+ and no shortness rebids own suit at 3 (extras)', () => {
+    // AQJ84=8, K73=3, K73=3, AJ4=4 → 18 HCP, 5-3-3-2, no shortness
+    const hand = makeHand({ spades: 'AQJ84', hearts: 'K73', diamonds: 'K73', clubs: 'AJ4' });
+    const bid = chooseBid(hand, 'south', seqJacoby1S());
+    expect(bid).toEqual({ type: 'bid', level: 3, strain: 'spades' });
+  });
+
+  it('opener with balanced 12-14 no shortness bids 3NT', () => {
+    // KJ854=4, K73=3, K73=3, A5=4 → 14 HCP, 5-3-3-2, no shortness
+    const hand = makeHand({ spades: 'KJ854', hearts: 'K73', diamonds: 'K73', clubs: 'A5' });
+    const bid = chooseBid(hand, 'south', seqJacoby1S());
+    expect(bid).toEqual({ type: 'bid', level: 3, strain: 'notrump' });
+  });
+
+  it('opener with balanced 12-14 no shortness signs off in 3NT', () => {
+    // KQ854=5, K73=3, Q73=2, Q5=2 → 12 HCP, 5-3-3-2 balanced, no shortness
+    const hand = makeHand({ spades: 'KQ854', hearts: 'K73', diamonds: 'Q73', clubs: 'Q5' });
+    const bid = chooseBid(hand, 'south', seqJacoby1S());
+    expect(bid).toEqual({ type: 'bid', level: 3, strain: 'notrump' });
+  });
+});

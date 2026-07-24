@@ -68,6 +68,8 @@ function explainResponse(call: BidCall, opening: LevelBid, byPartner: boolean): 
   }
   if (strain === 'notrump') {
     if (level === 1) return '1NT response: 6–10 HCP, no fit; forcing one round over 1♥/1♠.';
+    if (level === 2 && (openStrain === 'hearts' || openStrain === 'spades'))
+      return `Jacoby 2NT: game-forcing raise, 4+ ${STRAIN_NAME[openStrain]} support, 13+ HCP. Asks partner to describe (shortness, side suit, or strength).`;
     if (level === 2) return '2NT: 13–15 HCP, balanced, invitational-to-game.';
     if (level === 3) return '3NT: 15–17 HCP, balanced, denies a fit with partner.';
   }
@@ -78,6 +80,30 @@ function explainResponse(call: BidCall, opening: LevelBid, byPartner: boolean): 
   return `Bid ${level}${strain === 'notrump' ? 'NT' : STRAIN_NAME[strain]} in response to partner’s opening.`;
 }
 
+function explainJacoby2NTAnswer(call: BidCall, opening: LevelBid): string | null {
+  if (call.type !== 'bid') return null;
+  if (opening.strain !== 'hearts' && opening.strain !== 'spades') return null;
+  const { level, strain } = call;
+  const major = opening.strain;
+  const majorName = STRAIN_NAME[major];
+  if (level === 3 && strain !== major && strain !== 'notrump') {
+    return `Jacoby 2NT answer: singleton or void in ${STRAIN_NAME[strain]}. No slam interest denied.`;
+  }
+  if (level === 4 && strain !== major && strain !== 'notrump') {
+    return `Jacoby 2NT answer: 5-card side suit in ${STRAIN_NAME[strain]}, no shortness.`;
+  }
+  if (level === 3 && strain === major) {
+    return `Jacoby 2NT answer: 15+ HCP, no shortness, no side 5-card suit — extras with slam interest.`;
+  }
+  if (level === 3 && strain === 'notrump') {
+    return `Jacoby 2NT answer: 12–14 balanced, no shortness — minimum with no slam interest.`;
+  }
+  if (level === 4 && strain === major) {
+    return `Jacoby 2NT answer: minimum 12–14, no shortness, no side suit — fast arrival to game.`;
+  }
+  return null;
+}
+
 function explainOpenerRebid(
   call: BidCall,
   opening: LevelBid,
@@ -86,6 +112,13 @@ function explainOpenerRebid(
   if (call.type === 'pass') return 'Pass: minimum opening, no game interest.';
   if (call.type !== 'bid') return 'Opener’s rebid.';
   const { level, strain } = call;
+
+  // Jacoby 2NT answer
+  if (responseByPartner && responseByPartner.strain === 'notrump' && responseByPartner.level === 2
+      && (opening.strain === 'hearts' || opening.strain === 'spades')) {
+    const answer = explainJacoby2NTAnswer(call, opening);
+    if (answer) return answer;
+  }
 
   // Jump rebids
   if (opening.strain !== 'notrump') {
