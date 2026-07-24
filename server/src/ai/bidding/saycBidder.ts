@@ -37,6 +37,130 @@ function partnerIdx(seatIdx: number): number {
   return (seatIdx + 2) % 4;
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// Blackwood 4NT ace-ask (over agreed suit contracts)
+// ────────────────────────────────────────────────────────────────────────────
+
+function countAces(hand: Card[]): number {
+  return hand.filter(c => c.rank === 'A').length;
+}
+
+function countKings(hand: Card[]): number {
+  return hand.filter(c => c.rank === 'K').length;
+}
+
+/**
+ * Detects if partner's most recent bid is a Blackwood 4NT ask.
+ * True iff:
+ *   - partner just bid 4NT
+ *   - the auction has an established suit context (previous non-pass
+ *     bid before 4NT is a suit at 3 or 4, not a natural NT)
+ */
+function isPartnerBlackwoodAsk(seat: Seat, bidding: BiddingState): boolean {
+  const seatIdx = SEATS.indexOf(seat);
+  const partnerSeat = SEATS[partnerIdx(seatIdx)]!;
+  const calls = bidding.calls;
+  // Find partner's most recent bid
+  const partnerLast = [...calls].reverse().find(c => c.seat === partnerSeat && c.call.type === 'bid');
+  if (!partnerLast) return false;
+  const call = partnerLast.call as LevelBid;
+  if (call.level !== 4 || call.strain !== 'notrump') return false;
+  // Find the bid immediately preceding partner's 4NT
+  const partnerIdxInCalls = calls.indexOf(partnerLast);
+  const priorBids = calls
+    .slice(0, partnerIdxInCalls)
+    .filter(c => c.call.type === 'bid')
+    .map(c => c.call as LevelBid);
+  if (priorBids.length === 0) return false;
+  const prev = priorBids[priorBids.length - 1]!;
+  // If most recent prior bid is a natural NT (1NT/2NT/3NT), 4NT is quantitative, not Blackwood
+  if (prev.strain === 'notrump') return false;
+  // If auction only reached 1-of-a-suit, 4NT is more likely natural — require level ≥ 2
+  if (prev.level < 2) return false;
+  return true;
+}
+
+function answerBlackwood(hand: Card[]): BidCall {
+  const aces = countAces(hand);
+  // 5♣ = 0 or 4 aces, 5♦ = 1, 5♥ = 2, 5♠ = 3
+  const map: Record<number, Suit> = { 0: 'clubs', 1: 'diamonds', 2: 'hearts', 3: 'spades', 4: 'clubs' };
+  return { type: 'bid', level: 5, strain: map[aces]! };
+}
+
+/** Detects partner's 5NT king-ask following an earlier Blackwood 4NT sequence. */
+function isPartnerBlackwoodKingAsk(seat: Seat, bidding: BiddingState): boolean {
+  const seatIdx = SEATS.indexOf(seat);
+  const partnerSeat = SEATS[partnerIdx(seatIdx)]!;
+  const calls = bidding.calls;
+  const partnerLast = [...calls].reverse().find(c => c.seat === partnerSeat && c.call.type === 'bid');
+  if (!partnerLast) return false;
+  const call = partnerLast.call as LevelBid;
+  if (call.level !== 5 || call.strain !== 'notrump') return false;
+  // Ensure I previously answered Blackwood with 5-of-a-suit
+  const partnerIdxInCalls = calls.indexOf(partnerLast);
+  const myPrior = calls
+    .slice(0, partnerIdxInCalls)
+    .filter(c => c.seat === seat && c.call.type === 'bid');
+  const lastMine = myPrior[myPrior.length - 1];
+  if (!lastMine) return false;
+  const lastBid = lastMine.call as LevelBid;
+  return lastBid.level === 5 && lastBid.strain !== 'notrump';
+}
+
+function answerKingAsk(hand: Card[]): BidCall {
+  const kings = countKings(hand);
+  const map: Record<number, Suit> = { 0: 'clubs', 1: 'diamonds', 2: 'hearts', 3: 'spades', 4: 'clubs' };
+  return { type: 'bid', level: 6, strain: map[kings]! };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Gerber 4♣ ace-ask (over NT contracts)
+// Responses: 4♦=0/4, 4♥=1, 4♠=2, 4NT=3
+// ────────────────────────────────────────────────────────────────────────────
+
+function isPartnerGerberAsk(seat: Seat, bidding: BiddingState): boolean {
+  const seatIdx = SEATS.indexOf(seat);
+  const partnerSeat = SEATS[partnerIdx(seatIdx)]!;
+  const calls = bidding.calls;
+  const partnerLast = [...calls].reverse().find(c => c.seat === partnerSeat && c.call.type === 'bid');
+  if (!partnerLast) return false;
+  const call = partnerLast.call as LevelBid;
+  if (call.level !== 4 || call.strain !== 'clubs') return false;
+  // Prior bid must be a natural NT (1NT/2NT/3NT) for Gerber to apply
+  const partnerIdxInCalls = calls.indexOf(partnerLast);
+  const priorBids = calls
+    .slice(0, partnerIdxInCalls)
+    .filter(c => c.call.type === 'bid')
+    .map(c => c.call as LevelBid);
+  if (priorBids.length === 0) return false;
+  const prev = priorBids[priorBids.length - 1]!;
+  return prev.strain === 'notrump';
+}
+
+function answerGerber(hand: Card[]): BidCall {
+  const aces = countAces(hand);
+  const map: Record<number, { level: number; strain: Suit | 'notrump' }> = {
+    0: { level: 4, strain: 'diamonds' },
+    1: { level: 4, strain: 'hearts' },
+    2: { level: 4, strain: 'spades' },
+    3: { level: 4, strain: 'notrump' },
+    4: { level: 4, strain: 'diamonds' },
+  };
+  const m = map[aces]!;
+  return { type: 'bid', level: m.level, strain: m.strain };
+}
+
+// Ensures a chosen bid is legal (strictly higher than currentBid); else pass.
+function maybeLegal(chosen: BidCall, bidding: BiddingState): BidCall {
+  if (chosen.type !== 'bid') return chosen;
+  if (!bidding.currentBid) return chosen;
+  const cb = bidding.currentBid;
+  const strainIdx = (s: string) => ['clubs', 'diamonds', 'hearts', 'spades', 'notrump'].indexOf(s);
+  const higher = chosen.level > cb.level || (chosen.level === cb.level && strainIdx(chosen.strain) > strainIdx(cb.strain));
+  return higher ? chosen : { type: 'pass' };
+}
+
+
 function classifyRole(seat: Seat, bidding: BiddingState): Role {
   const seatIdx = SEATS.indexOf(seat);
   const partnerSeat = SEATS[partnerIdx(seatIdx)]!;
@@ -503,8 +627,26 @@ function responderRebid(
   response: LevelBid,
   openerRebid: BidCall | null,
 ): BidCall {
-  const { hcp, shape } = eval_;
+  const { hcp, totalPoints, shape } = eval_;
   if (!openerRebid || openerRebid.type !== 'bid') return { type: 'pass' };
+
+  // Blackwood ask: opener raised our major (or agreed a fit) and we have slam-try values.
+  const openerRaisedMyMajor =
+    (response.strain === 'hearts' || response.strain === 'spades') &&
+    openerRebid.strain === response.strain &&
+    openerRebid.level >= 3;
+  const openerJumpRaisedInAJacoby =
+    // Jacoby 2NT sequence: I bid 2NT, opener answered. If opener rebid own major at 3/4 = min/max
+    response.strain === 'notrump' && response.level === 2 &&
+    (opening.strain === 'hearts' || opening.strain === 'spades') &&
+    openerRebid.strain === opening.strain;
+  if (openerRaisedMyMajor && totalPoints >= 17 && shape[response.strain as Suit] >= 5) {
+    return { type: 'bid', level: 4, strain: 'notrump' };
+  }
+  if (openerJumpRaisedInAJacoby && openerRebid.level === 3 && totalPoints >= 16) {
+    // Opener showed extras (15+) → we have GF+ and slam try
+    return { type: 'bid', level: 4, strain: 'notrump' };
+  }
 
   // NMF: if opener rebid 1NT or 2NT and I have invitational+ values with major interest,
   // bid the "new minor" to ask about 3-card support / 4-card other major.
@@ -684,6 +826,18 @@ export function chooseBid(
   bidding: BiddingState,
 ): BidCall {
   const eval_ = evaluateHand(hand);
+
+  // Blackwood / Gerber answers take priority — partner has just asked.
+  if (isPartnerBlackwoodAsk(seat, bidding)) {
+    return maybeLegal(answerBlackwood(hand), bidding);
+  }
+  if (isPartnerBlackwoodKingAsk(seat, bidding)) {
+    return maybeLegal(answerKingAsk(hand), bidding);
+  }
+  if (isPartnerGerberAsk(seat, bidding)) {
+    return maybeLegal(answerGerber(hand), bidding);
+  }
+
   const role = classifyRole(seat, bidding);
 
   let chosen: BidCall;

@@ -313,6 +313,52 @@ export function explainBidAt(
     return `Bid ${call.level}${call.strain === 'notrump' ? 'NT' : STRAIN_NAME[call.strain]}.`;
   }
 
+  // Blackwood / Gerber: partner asked and this call is an ace/king count response.
+  {
+    const priorBids = calls.slice(0, index).filter(c => c.call.type === 'bid');
+    const partnerLastBid = [...calls.slice(0, index)]
+      .reverse()
+      .find(c => c.seat === partnerOf(seat) && c.call.type === 'bid');
+    const partnerLast = partnerLastBid && partnerLastBid.call.type === 'bid' ? partnerLastBid.call : null;
+    if (partnerLast && call.type === 'bid') {
+      const prevBid = priorBids.length >= 2 ? (priorBids[priorBids.length - 2]!.call as LevelBid) : null;
+      // Blackwood ask by partner: partner just bid 4NT after a suit auction (prev bid is a suit at level >= 2)
+      if (partnerLast.level === 4 && partnerLast.strain === 'notrump'
+          && prevBid && prevBid.strain !== 'notrump' && prevBid.level >= 2
+          && call.level === 5) {
+        const aceMap: Record<string, string> = { clubs: '0 or 4 aces', diamonds: '1 ace', hearts: '2 aces', spades: '3 aces' };
+        const aces = aceMap[call.strain];
+        if (aces) return `Blackwood response: ${aces}.`;
+      }
+      // Blackwood king-ask: partner just bid 5NT, following our own 5-of-a-suit response
+      if (partnerLast.level === 5 && partnerLast.strain === 'notrump' && call.level === 6) {
+        const kingMap: Record<string, string> = { clubs: '0 or 4 kings', diamonds: '1 king', hearts: '2 kings', spades: '3 kings' };
+        const kings = kingMap[call.strain];
+        if (kings) return `Blackwood king-ask response: ${kings}.`;
+      }
+      // Gerber ask: partner just bid 4♣ over a natural NT bid
+      if (partnerLast.level === 4 && partnerLast.strain === 'clubs'
+          && prevBid && prevBid.strain === 'notrump' && call.level === 4) {
+        const gMap: Record<string, string> = { diamonds: '0 or 4 aces', hearts: '1 ace', spades: '2 aces', notrump: '3 aces' };
+        const aces = gMap[call.strain];
+        if (aces) return `Gerber response: ${aces}.`;
+      }
+    }
+    // Blackwood/Gerber ASK explanations (from the asker's side)
+    if (call.type === 'bid') {
+      const partnerLastB = partnerLast;
+      if (call.level === 4 && call.strain === 'notrump' && partnerLastB && partnerLastB.strain !== 'notrump' && partnerLastB.level >= 2) {
+        return 'Blackwood 4NT: ace-ask. Partner responds 5♣=0/4, 5♦=1, 5♥=2, 5♠=3 aces.';
+      }
+      if (call.level === 4 && call.strain === 'clubs' && partnerLastB && partnerLastB.strain === 'notrump') {
+        return 'Gerber 4♣: ace-ask over NT. Partner responds 4♦=0/4, 4♥=1, 4♠=2, 4NT=3 aces.';
+      }
+      if (call.level === 5 && call.strain === 'notrump' && partnerLastB && partnerLastB.level === 5) {
+        return 'Blackwood 5NT: king-ask. Also confirms all 4 aces are present, so slam is safe.';
+      }
+    }
+  }
+
   // Alias earlier count for downstream logic
   const priorBidsBySeat = priorBidsBySeatBefore;
 

@@ -357,3 +357,92 @@ describe('SAYC bidder â€” Jacoby 2NT', () => {
     expect(bid).toEqual({ type: 'bid', level: 3, strain: 'notrump' });
   });
 });
+
+describe('SAYC bidder — Blackwood 4NT', () => {
+  // Auction: 1S - P - 3S - P - 4NT (Blackwood by opener)
+  // North (responder/partner) must answer aces.
+  const seqAfter4NT = (): BiddingState =>
+    makeBidding([
+      { seat: 'south', call: { type: 'bid', level: 1, strain: 'spades' } },
+      { seat: 'west',  call: { type: 'pass' } },
+      { seat: 'north', call: { type: 'bid', level: 3, strain: 'spades' } },
+      { seat: 'east',  call: { type: 'pass' } },
+      { seat: 'south', call: { type: 'bid', level: 4, strain: 'notrump' } },
+      { seat: 'west',  call: { type: 'pass' } },
+    ]);
+
+  it('responds 5C with 0 aces', () => {
+    // No aces
+    const hand = makeHand({ spades: 'KQ54', hearts: 'K73', diamonds: 'KJ4', clubs: 'Q54' });
+    const bid = chooseBid(hand, 'north', seqAfter4NT());
+    expect(bid).toEqual({ type: 'bid', level: 5, strain: 'clubs' });
+  });
+
+  it('responds 5D with 1 ace', () => {
+    const hand = makeHand({ spades: 'AQ54', hearts: 'K73', diamonds: 'KJ4', clubs: 'Q54' });
+    const bid = chooseBid(hand, 'north', seqAfter4NT());
+    expect(bid).toEqual({ type: 'bid', level: 5, strain: 'diamonds' });
+  });
+
+  it('responds 5H with 2 aces', () => {
+    const hand = makeHand({ spades: 'AQ54', hearts: 'A73', diamonds: 'KJ4', clubs: 'Q54' });
+    const bid = chooseBid(hand, 'north', seqAfter4NT());
+    expect(bid).toEqual({ type: 'bid', level: 5, strain: 'hearts' });
+  });
+
+  it('responds 5S with 3 aces', () => {
+    const hand = makeHand({ spades: 'AQ54', hearts: 'A73', diamonds: 'AJ4', clubs: 'Q54' });
+    const bid = chooseBid(hand, 'north', seqAfter4NT());
+    expect(bid).toEqual({ type: 'bid', level: 5, strain: 'spades' });
+  });
+
+  it('does NOT treat 4NT after natural NT sequence as Blackwood (quantitative)', () => {
+    // Auction: 1NT - P - 4NT is quantitative invite to 6NT, NOT Blackwood.
+    // Bidder should NOT reply with ace-count.
+    const seq = makeBidding([
+      { seat: 'south', call: { type: 'bid', level: 1, strain: 'notrump' } },
+      { seat: 'west',  call: { type: 'pass' } },
+      { seat: 'north', call: { type: 'bid', level: 4, strain: 'notrump' } },
+      { seat: 'east',  call: { type: 'pass' } },
+    ]);
+    const hand = makeHand({ spades: 'AK54', hearts: 'A73', diamonds: 'AJ4', clubs: 'Q54' });
+    const bid = chooseBid(hand, 'south', seq);
+    // Should not be a 5-of-a-suit ace-count response
+    expect(bid).not.toEqual({ type: 'bid', level: 5, strain: 'spades' });
+  });
+});
+
+describe('SAYC bidder — Gerber 4?', () => {
+  // 1NT - P - 4C (Gerber) - P - ?
+  const seqAfterGerber = (): BiddingState =>
+    makeBidding([
+      { seat: 'south', call: { type: 'bid', level: 1, strain: 'notrump' } },
+      { seat: 'west',  call: { type: 'pass' } },
+      { seat: 'north', call: { type: 'bid', level: 4, strain: 'clubs' } },
+      { seat: 'east',  call: { type: 'pass' } },
+    ]);
+
+  it('responds 4D with 0 aces', () => {
+    const hand = makeHand({ spades: 'KQ54', hearts: 'K73', diamonds: 'KJ4', clubs: 'Q54' });
+    const bid = chooseBid(hand, 'south', seqAfterGerber());
+    expect(bid).toEqual({ type: 'bid', level: 4, strain: 'diamonds' });
+  });
+
+  it('responds 4H with 1 ace', () => {
+    const hand = makeHand({ spades: 'AQ54', hearts: 'K73', diamonds: 'KJ4', clubs: 'Q54' });
+    const bid = chooseBid(hand, 'south', seqAfterGerber());
+    expect(bid).toEqual({ type: 'bid', level: 4, strain: 'hearts' });
+  });
+
+  it('responds 4S with 2 aces', () => {
+    const hand = makeHand({ spades: 'AQ54', hearts: 'A73', diamonds: 'KJ4', clubs: 'Q54' });
+    const bid = chooseBid(hand, 'south', seqAfterGerber());
+    expect(bid).toEqual({ type: 'bid', level: 4, strain: 'spades' });
+  });
+
+  it('responds 4NT with 3 aces', () => {
+    const hand = makeHand({ spades: 'AQ54', hearts: 'A73', diamonds: 'AJ4', clubs: 'Q54' });
+    const bid = chooseBid(hand, 'south', seqAfterGerber());
+    expect(bid).toEqual({ type: 'bid', level: 4, strain: 'notrump' });
+  });
+});
