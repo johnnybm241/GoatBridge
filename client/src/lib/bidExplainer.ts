@@ -133,6 +133,34 @@ function explainOvercall(call: BidCall, opening: LevelBid): string {
   return `Overcall ${level}${strain === 'notrump' ? 'NT' : STRAIN_NAME[strain]}.`;
 }
 
+function explainOvercallerRebid(
+  call: BidCall,
+  calls: BiddingState['calls'],
+  seat: Seat,
+  index: number,
+): string {
+  if (call.type === 'pass') return 'Overcaller passes: nothing more to add.';
+  if (call.type === 'double') return 'Competitive/responsive double: extra values, willing to compete or defend.';
+  if (call.type === 'redouble') return 'Redouble in competition: strength-showing.';
+  const { level, strain } = call;
+  // Find overcaller's previous bid(s)
+  const priorOwnBids = calls
+    .slice(0, index)
+    .filter(c => c.seat === seat && c.call.type === 'bid')
+    .map(c => c.call as { type: 'bid'; level: number; strain: string });
+  const firstOwnBid = priorOwnBids[0];
+
+  if (firstOwnBid && strain === firstOwnBid.strain) {
+    if (level === firstOwnBid.level + 1)
+      return `Rebidding ${STRAIN_NAME[strain as keyof typeof STRAIN_NAME] ?? strain} competitively: 6+ card suit, showing extra length rather than extra strength.`;
+    if (level >= firstOwnBid.level + 2)
+      return `Jump rebid in ${STRAIN_NAME[strain as keyof typeof STRAIN_NAME] ?? strain}: strong overcall (typically 16+ HCP) with a long suit.`;
+  }
+  if (strain === 'notrump')
+    return `${level}NT by the overcaller: shows a stopper in opener's suit and extra values.`;
+  return `Overcaller's rebid ${level}${STRAIN_NAME[strain as keyof typeof STRAIN_NAME]}: competing further based on the auction.`;
+}
+
 /**
  * Explain a bid at position `index` in the auction using SAYC conventions.
  * Explanations are heuristic and mirror the server's saycBidder logic —
@@ -193,7 +221,30 @@ export function explainBidAt(
     if (e.seat === seat && e.call.type === 'bid') priorBidsBySeat++;
   }
 
-  if (isDefensive) return explainOvercall(call, opening);
+  if (isDefensive) {
+    const partnerSeat = partnerOf(seat);
+    const partnerAlreadyBid = calls
+      .slice(0, index)
+      .some(c => c.seat === partnerSeat && c.call.type === 'bid');
+    if (priorBidsBySeat === 0 && !partnerAlreadyBid) return explainOvercall(call, opening);
+    if (priorBidsBySeat === 0 && partnerAlreadyBid) {
+      const partnerBid = calls
+        .slice(0, index)
+        .filter(c => c.seat === partnerSeat && c.call.type === 'bid')
+        .pop();
+      const pb = partnerBid && partnerBid.call.type === 'bid' ? partnerBid.call : null;
+      if (call.type === 'bid' && pb && call.strain === pb.strain) {
+        if (call.level === pb.level + 1)
+          return `Raising partner's overcall in ${STRAIN_NAME[call.strain as keyof typeof STRAIN_NAME] ?? call.strain}: 3+ card support, competitive (6–9 HCP).`;
+        if (call.level >= pb.level + 2)
+          return `Jump raise of partner's overcall: 10+ HCP with support, invitational.`;
+      }
+      if (call.type === 'bid')
+        return `Advance in ${call.strain === 'notrump' ? 'NT' : STRAIN_NAME[call.strain as keyof typeof STRAIN_NAME]}: new suit response to partner's overcall (constructive, not forcing).`;
+      return 'Advancer pass: no fit and no bid available.';
+    }
+    return explainOvercallerRebid(call, calls, seat, index);
+  }
 
   if (isOpener) {
     if (priorBidsBySeat === 1) {
