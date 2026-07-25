@@ -132,6 +132,7 @@ export default function BridgeTable({
   lastHandResult,
 }: BridgeTableProps) {
   const [showLastTrick, setShowLastTrick] = useState(false);
+  const [showAuctionInPlay, setShowAuctionInPlay] = useState(false);
   const claimFromSeat = useGameStore(s => s.claimFromSeat);
   const undoFromSeat = useGameStore(s => s.undoFromSeat);
   const invalidCardMessage = useGameStore(s => s.invalidCardMessage);
@@ -247,6 +248,8 @@ export default function BridgeTable({
         <div className="relative flex-1 flex items-center justify-center min-h-0 overflow-hidden self-stretch">
           {phase === 'bidding' ? (
             <AuctionHistory bidding={bidding} dealer={gameState.dealer} vulnerability={vulnerability} seats={seats} />
+          ) : phase === 'playing' && showAuctionInPlay ? (
+            <AuctionHistory bidding={bidding} dealer={gameState.dealer} vulnerability={vulnerability} seats={seats} />
           ) : (
             <TrickArea currentTrick={displayTrick} yourSeat={yourSeat} isStatic={showLastTrick} />
           )}
@@ -290,6 +293,14 @@ export default function BridgeTable({
               className="block text-cream/80 hover:text-cream border border-cream/40 hover:border-cream/70 rounded px-2 py-1 text-xs font-bold transition-colors select-none"
             >
               Last trick
+            </button>
+          )}
+          {phase === 'playing' && (
+            <button
+              onClick={() => setShowAuctionInPlay(v => !v)}
+              className="block text-cream/80 hover:text-cream border border-cream/40 hover:border-cream/70 rounded px-2 py-1 text-xs font-bold transition-colors"
+            >
+              {showAuctionInPlay ? 'Hide auction' : 'View auction'}
             </button>
           )}
           {(phase === 'playing' || phase === 'bidding') && yourSeat && !claimFromSeat && !undoFromSeat && (
