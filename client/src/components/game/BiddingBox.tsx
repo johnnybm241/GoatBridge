@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { BidCall, BiddingState, Strain, Seat } from '@goatbridge/shared';
 import { STRAIN_ORDER } from '@goatbridge/shared';
@@ -11,11 +12,11 @@ interface BiddingBoxProps {
 }
 
 const STRAIN_DISPLAY: Record<Strain, { label: string; color: string }> = {
-  clubs: { label: '♣', color: 'text-gray-900' },
+  clubs: { label: '♣', color: 'text-slate-900' },
   diamonds: { label: '♦', color: 'text-red-600' },
   hearts: { label: '♥', color: 'text-red-600' },
-  spades: { label: '♠', color: 'text-gray-900' },
-  notrump: { label: 'NT', color: 'text-blue-800' },
+  spades: { label: '♠', color: 'text-slate-900' },
+  notrump: { label: 'NT', color: 'text-blue-700' },
 };
 
 const LEVELS = [1, 2, 3, 4, 5, 6, 7] as const;
@@ -30,13 +31,20 @@ function isBidAvailable(level: number, strain: Strain, state: BiddingState): boo
   return false;
 }
 
-export default function BiddingBox({ biddingState, onBid, disabled = false, yourSeat = null }: BiddingBoxProps) {
-  const canDouble = !disabled &&
-    biddingState.currentBid !== null &&
-    biddingState.doubleStatus === 'none';
+function isLevelAvailable(level: number, state: BiddingState): boolean {
+  return STRAINS.some(s => isBidAvailable(level, s, state));
+}
 
-  const canRedouble = !disabled &&
-    biddingState.doubleStatus === 'doubled';
+export default function BiddingBox({ biddingState, onBid, disabled = false, yourSeat = null }: BiddingBoxProps) {
+  const [selectedLevel, setSelectedLevel] = useState<1 | 2 | 3 | 4 | 5 | 6 | 7 | null>(null);
+
+  // Reset selection when the auction advances (a new bid came in) or box is disabled
+  useEffect(() => {
+    setSelectedLevel(null);
+  }, [biddingState.calls.length, disabled]);
+
+  const canDouble = !disabled && biddingState.currentBid !== null && biddingState.doubleStatus === 'none';
+  const canRedouble = !disabled && biddingState.doubleStatus === 'doubled';
 
   const preview = (call: BidCall): string | undefined => {
     if (!yourSeat) return undefined;
@@ -47,49 +55,82 @@ export default function BiddingBox({ biddingState, onBid, disabled = false, your
     return explainBidAt(hypothetical.calls.length - 1, hypothetical, yourSeat);
   };
 
+  const submitBid = (strain: Strain) => {
+    if (selectedLevel === null) return;
+    if (!isBidAvailable(selectedLevel, strain, biddingState)) return;
+    onBid({ type: 'bid', level: selectedLevel, strain });
+    setSelectedLevel(null);
+  };
+
   return (
-    <AnimatePresence>
+    <AnimatePresence mode="wait">
       <motion.div
-        initial={{ y: 20, opacity: 0 }}
+        key="bidding-box"
+        initial={{ y: 12, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="bg-navy/95 border border-gold/40 rounded-lg p-2 shadow-2xl bid-box-enter inline-block"
+        exit={{ y: 12, opacity: 0 }}
+        transition={{ duration: 0.15 }}
+        className="inline-flex flex-col gap-1.5 bg-gradient-to-b from-slate-100 to-slate-200 border border-slate-400 rounded-lg p-2 shadow-xl"
       >
-        {/* Bid grid: 5 cols (strains) × visible levels */}
-        <div className="grid grid-cols-5 gap-1 mb-1.5">
+        {/* Level row */}
+        <div className="flex gap-1">
           {LEVELS.map(level => {
-            const rowHasAvailable = STRAINS.some(s => !disabled && isBidAvailable(level, s, biddingState));
-            if (!rowHasAvailable) return null;
-            return STRAINS.map(strain => {
-              const available = !disabled && isBidAvailable(level, strain, biddingState);
-              const strainDisplay = STRAIN_DISPLAY[strain];
-              return (
-                <button
-                  key={`${level}-${strain}`}
-                  onClick={() => available && onBid({ type: 'bid', level, strain })}
-                  disabled={!available}
-                  title={available ? preview({ type: 'bid', level, strain }) : undefined}
-                  className={`
-                    w-9 h-7 rounded text-xs font-bold transition-all flex items-center justify-center gap-0.5
-                    ${available
-                      ? 'bg-felt hover:bg-felt-light text-cream border border-felt-light hover:border-gold/50 hover:scale-105 cursor-help'
-                      : 'bg-navy/30 text-cream/20 border border-transparent cursor-not-allowed'}
-                  `}
-                >
-                  <span>{level}</span>
-                  <span className={available ? strainDisplay.color : ''}>{strainDisplay.label}</span>
-                </button>
-              );
-            });
+            const avail = !disabled && isLevelAvailable(level, biddingState);
+            const selected = selectedLevel === level;
+            return (
+              <button
+                key={level}
+                onClick={() => avail && setSelectedLevel(selected ? null : level)}
+                disabled={!avail}
+                className={`w-8 h-9 rounded-md text-sm font-bold transition-all ${
+                  selected
+                    ? 'bg-amber-500 text-white shadow-inner ring-2 ring-amber-600 scale-105'
+                    : avail
+                    ? 'bg-white text-slate-800 hover:bg-amber-100 border border-slate-300 shadow-sm active:scale-95'
+                    : 'bg-slate-200 text-slate-400 border border-slate-200 cursor-not-allowed opacity-50'
+                }`}
+              >
+                {level}
+              </button>
+            );
           })}
         </div>
 
-        {/* Special buttons */}
-        <div className="grid grid-cols-3 gap-1">
+        {/* Strain row (only enabled when a level is selected) */}
+        <div className="flex gap-1">
+          {STRAINS.map(strain => {
+            const avail =
+              !disabled && selectedLevel !== null && isBidAvailable(selectedLevel, strain, biddingState);
+            const d = STRAIN_DISPLAY[strain];
+            return (
+              <button
+                key={strain}
+                onClick={() => submitBid(strain)}
+                disabled={!avail}
+                title={
+                  avail && selectedLevel !== null
+                    ? preview({ type: 'bid', level: selectedLevel, strain })
+                    : undefined
+                }
+                className={`w-8 h-9 rounded-md text-lg font-bold flex items-center justify-center transition-all ${
+                  avail
+                    ? `bg-white ${d.color} hover:bg-amber-100 border border-slate-300 shadow-sm active:scale-95 cursor-help`
+                    : 'bg-slate-200 text-slate-300 border border-slate-200 cursor-not-allowed opacity-50'
+                }`}
+              >
+                <span className={strain === 'notrump' ? 'text-xs font-bold' : ''}>{d.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Action row: Pass / Dbl / Rdbl */}
+        <div className="flex gap-1 mt-0.5">
           <button
             onClick={() => !disabled && onBid({ type: 'pass' })}
             disabled={disabled}
             title={!disabled ? preview({ type: 'pass' }) : undefined}
-            className="py-1 rounded text-xs font-bold bg-green-800 hover:bg-green-700 text-cream border border-green-600 disabled:opacity-30 transition-colors cursor-help disabled:cursor-not-allowed"
+            className="flex-1 h-8 rounded-md text-xs font-bold bg-green-600 hover:bg-green-500 text-white shadow-sm active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-help"
           >
             Pass
           </button>
@@ -97,17 +138,17 @@ export default function BiddingBox({ biddingState, onBid, disabled = false, your
             onClick={() => canDouble && onBid({ type: 'double' })}
             disabled={!canDouble}
             title={canDouble ? preview({ type: 'double' }) : undefined}
-            className="py-1 rounded text-xs font-bold bg-red-900 hover:bg-red-800 text-cream border border-red-700 disabled:opacity-30 transition-colors cursor-help disabled:cursor-not-allowed"
+            className="flex-1 h-8 rounded-md text-xs font-bold bg-red-600 hover:bg-red-500 text-white shadow-sm active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-help"
           >
-            Dbl
+            X
           </button>
           <button
             onClick={() => canRedouble && onBid({ type: 'redouble' })}
             disabled={!canRedouble}
             title={canRedouble ? preview({ type: 'redouble' }) : undefined}
-            className="py-1 rounded text-xs font-bold bg-blue-900 hover:bg-blue-800 text-cream border border-blue-700 disabled:opacity-30 transition-colors cursor-help disabled:cursor-not-allowed"
+            className="flex-1 h-8 rounded-md text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-sm active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-help"
           >
-            Rdbl
+            XX
           </button>
         </div>
       </motion.div>
