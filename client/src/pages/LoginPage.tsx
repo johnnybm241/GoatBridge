@@ -5,21 +5,47 @@ import { useAuthStore, setRememberMe } from '../store/authStore.js';
 import { initSocket } from '../socket.js';
 import api from '../api.js';
 
-const REMEMBERED_USERNAME_KEY = 'goatbridge-remembered-username';
-const REMEMBERED_PASSWORD_KEY = 'goatbridge-remembered-password';
+const REMEMBERED_LOGIN_KEY = 'goatbridge-remembered-login';
+const LEGACY_REMEMBERED_USERNAME_KEY = 'goatbridge-remembered-username';
+const LEGACY_REMEMBERED_PASSWORD_KEY = 'goatbridge-remembered-password';
+
+function getRememberedLogin(): { username: string; password: string } | null {
+  if (typeof window === 'undefined') return null;
+  const raw = localStorage.getItem(REMEMBERED_LOGIN_KEY);
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw) as { username?: unknown; password?: unknown };
+      if (typeof parsed.username === 'string' && typeof parsed.password === 'string') {
+        return { username: parsed.username, password: parsed.password };
+      }
+    } catch {
+      // Ignore malformed remembered payload and continue to legacy fallback.
+    }
+  }
+
+  const legacyUsername = localStorage.getItem(LEGACY_REMEMBERED_USERNAME_KEY);
+  const legacyPassword = localStorage.getItem(LEGACY_REMEMBERED_PASSWORD_KEY);
+  if (legacyUsername === null || legacyPassword === null) return null;
+
+  const remembered = { username: legacyUsername, password: legacyPassword };
+  localStorage.setItem(REMEMBERED_LOGIN_KEY, JSON.stringify(remembered));
+  localStorage.removeItem(LEGACY_REMEMBERED_USERNAME_KEY);
+  localStorage.removeItem(LEGACY_REMEMBERED_PASSWORD_KEY);
+  return remembered;
+}
 
 export default function LoginPage() {
   const [username, setUsername] = useState(
-    () => (typeof window !== 'undefined' ? localStorage.getItem(REMEMBERED_USERNAME_KEY) ?? '' : ''),
+    () => getRememberedLogin()?.username ?? '',
   );
   const [password, setPassword] = useState(
-    () => (typeof window !== 'undefined' ? localStorage.getItem(REMEMBERED_PASSWORD_KEY) ?? '' : ''),
+    () => getRememberedLogin()?.password ?? '',
   );
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMeState] = useState(
-    () => (typeof window !== 'undefined' ? localStorage.getItem(REMEMBERED_USERNAME_KEY) !== null : true),
+    () => (typeof window !== 'undefined' ? getRememberedLogin() !== null : true),
   );
   const navigate = useNavigate();
   const setAuth = useAuthStore(s => s.setAuth);
@@ -36,11 +62,9 @@ export default function LoginPage() {
       const res = await axios.post('/auth/login', { username, password });
       const { token, userId } = res.data as { token: string; userId: string; username: string };
       if (rememberMe) {
-        localStorage.setItem(REMEMBERED_USERNAME_KEY, username);
-        localStorage.setItem(REMEMBERED_PASSWORD_KEY, password);
+        localStorage.setItem(REMEMBERED_LOGIN_KEY, JSON.stringify({ username, password }));
       } else {
-        localStorage.removeItem(REMEMBERED_USERNAME_KEY);
-        localStorage.removeItem(REMEMBERED_PASSWORD_KEY);
+        localStorage.removeItem(REMEMBERED_LOGIN_KEY);
       }
       setRememberMe(rememberMe);
       setAuth(token, userId, username);
@@ -73,6 +97,7 @@ export default function LoginPage() {
             <label className="block text-cream/80 text-sm mb-1">Username</label>
             <input
               type="text"
+              name="username"
               value={username}
               onChange={e => setUsername(e.target.value)}
               autoComplete="username"
@@ -85,6 +110,7 @@ export default function LoginPage() {
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
+                name="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 autoComplete="current-password"
