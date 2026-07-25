@@ -52,23 +52,16 @@ export default function BiddingBox({ biddingState, onBid, disabled = false, your
       <motion.div
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="bg-navy/90 border border-gold/40 rounded-xl p-3 shadow-2xl bid-box-enter"
+        className="bg-navy/95 border border-gold/40 rounded-lg p-2 shadow-2xl bid-box-enter inline-block"
       >
-        <div className="text-gold text-xs font-bold text-center mb-2">Your Bid</div>
-
-        {/* Bid grid */}
-        <div className="grid grid-cols-5 gap-1 mb-2">
-          {/* Header row */}
-          {STRAINS.map(strain => (
-            <div key={strain} className={`text-center text-sm font-bold ${STRAIN_DISPLAY[strain].color}`}>
-              {STRAIN_DISPLAY[strain].label}
-            </div>
-          ))}
-
-          {/* Bid buttons */}
-          {LEVELS.map(level =>
-            STRAINS.map(strain => {
+        {/* Bid grid: 5 cols (strains) × visible levels */}
+        <div className="grid grid-cols-5 gap-1 mb-1.5">
+          {LEVELS.map(level => {
+            const rowHasAvailable = STRAINS.some(s => !disabled && isBidAvailable(level, s, biddingState));
+            if (!rowHasAvailable) return null;
+            return STRAINS.map(strain => {
               const available = !disabled && isBidAvailable(level, strain, biddingState);
+              const strainDisplay = STRAIN_DISPLAY[strain];
               return (
                 <button
                   key={`${level}-${strain}`}
@@ -76,17 +69,18 @@ export default function BiddingBox({ biddingState, onBid, disabled = false, your
                   disabled={!available}
                   title={available ? preview({ type: 'bid', level, strain }) : undefined}
                   className={`
-                    w-8 h-8 rounded text-xs font-bold transition-all
+                    w-9 h-7 rounded text-xs font-bold transition-all flex items-center justify-center gap-0.5
                     ${available
                       ? 'bg-felt hover:bg-felt-light text-cream border border-felt-light hover:border-gold/50 hover:scale-105 cursor-help'
                       : 'bg-navy/30 text-cream/20 border border-transparent cursor-not-allowed'}
                   `}
                 >
-                  {level}
+                  <span>{level}</span>
+                  <span className={available ? strainDisplay.color : ''}>{strainDisplay.label}</span>
                 </button>
               );
-            })
-          )}
+            });
+          })}
         </div>
 
         {/* Special buttons */}
@@ -95,7 +89,7 @@ export default function BiddingBox({ biddingState, onBid, disabled = false, your
             onClick={() => !disabled && onBid({ type: 'pass' })}
             disabled={disabled}
             title={!disabled ? preview({ type: 'pass' }) : undefined}
-            className="py-1.5 rounded text-xs font-bold bg-green-800 hover:bg-green-700 text-cream border border-green-600 disabled:opacity-30 transition-colors cursor-help disabled:cursor-not-allowed"
+            className="py-1 rounded text-xs font-bold bg-green-800 hover:bg-green-700 text-cream border border-green-600 disabled:opacity-30 transition-colors cursor-help disabled:cursor-not-allowed"
           >
             Pass
           </button>
@@ -103,7 +97,7 @@ export default function BiddingBox({ biddingState, onBid, disabled = false, your
             onClick={() => canDouble && onBid({ type: 'double' })}
             disabled={!canDouble}
             title={canDouble ? preview({ type: 'double' }) : undefined}
-            className="py-1.5 rounded text-xs font-bold bg-red-900 hover:bg-red-800 text-cream border border-red-700 disabled:opacity-30 transition-colors cursor-help disabled:cursor-not-allowed"
+            className="py-1 rounded text-xs font-bold bg-red-900 hover:bg-red-800 text-cream border border-red-700 disabled:opacity-30 transition-colors cursor-help disabled:cursor-not-allowed"
           >
             Dbl
           </button>
@@ -111,7 +105,7 @@ export default function BiddingBox({ biddingState, onBid, disabled = false, your
             onClick={() => canRedouble && onBid({ type: 'redouble' })}
             disabled={!canRedouble}
             title={canRedouble ? preview({ type: 'redouble' }) : undefined}
-            className="py-1.5 rounded text-xs font-bold bg-blue-900 hover:bg-blue-800 text-cream border border-blue-700 disabled:opacity-30 transition-colors cursor-help disabled:cursor-not-allowed"
+            className="py-1 rounded text-xs font-bold bg-blue-900 hover:bg-blue-800 text-cream border border-blue-700 disabled:opacity-30 transition-colors cursor-help disabled:cursor-not-allowed"
           >
             Rdbl
           </button>
