@@ -1,4 +1,4 @@
-import type { Card, Suit, Trick, Strain, Seat } from '@goatbridge/shared';
+import type { Card, Suit, Trick, Strain, Seat, BiddingState } from '@goatbridge/shared';
 import { RANK_ORDER } from '@goatbridge/shared';
 
 const HIGH_HONORS = new Set(['J', 'Q', 'K', 'A']);
@@ -15,6 +15,7 @@ export function selectDefenderCard(
   seat: Seat,
   declarer: Seat | null,
   dummy: Seat | null,
+  bidding?: BiddingState,
 ): Card {
   if (hand.length === 0) throw new Error('Empty hand');
 
@@ -25,7 +26,7 @@ export function selectDefenderCard(
 
   // Opening lead
   if (!trick || trick.cards.length === 0) {
-    return openingLead(hand, trumpSuit, trumpStrain === 'notrump');
+    return openingLead(hand, trumpSuit, trumpStrain === 'notrump', seat, declarerSide, bidding);
   }
 
   const ledSuit = trick.cards[0]!.card.suit;
@@ -146,13 +147,29 @@ export function selectDeclarerCard(
   return lowestCard(activeHand);
 }
 
-function openingLead(hand: Card[], trumpSuit: Suit | null, isNT: boolean): Card {
+function openingLead(
+  hand: Card[],
+  trumpSuit: Suit | null,
+  isNT: boolean,
+  seat: Seat,
+  declarerSide: Set<Seat | null>,
+  bidding?: BiddingState,
+): Card {
   // vs NT: 4th best from longest and strongest
   // vs suit: top of sequence or singleton for ruff
   const suitCounts: Record<Suit, Card[]> = { clubs: [], diamonds: [], hearts: [], spades: [] };
   for (const card of hand) {
     if (card.suit !== trumpSuit) {
       suitCounts[card.suit].push(card);
+    }
+  }
+
+  const partnerSuit = getPartnerShownSuit(seat, declarerSide, bidding);
+  if (partnerSuit && partnerSuit !== trumpSuit) {
+    const partnerSuitCards = [...suitCounts[partnerSuit]].sort((a, b) => rankValue(b.rank) - rankValue(a.rank));
+    if (partnerSuitCards.length >= 3) {
+      if (isNT && partnerSuitCards.length >= 4) return partnerSuitCards[3]!;
+      return partnerSuitCards[0]!;
     }
   }
 
@@ -184,6 +201,23 @@ function openingLead(hand: Card[], trumpSuit: Suit | null, isNT: boolean): Card 
   }
 
   return suitCards[0] ?? lowestCard(hand);
+}
+
+function getPartnerShownSuit(
+  seat: Seat,
+  declarerSide: Set<Seat | null>,
+  bidding?: BiddingState,
+): Suit | null {
+  if (!bidding) return null;
+  const allSeats: Seat[] = ['north', 'east', 'south', 'west'];
+  const partner = allSeats.find(s => s !== seat && !declarerSide.has(s)) ?? null;
+  if (!partner) return null;
+
+  const partnerNaturalSuits = bidding.calls
+    .filter(entry => entry.seat === partner && entry.call.type === 'bid' && entry.call.strain !== 'notrump')
+    .map(entry => entry.call.strain as Suit);
+  if (partnerNaturalSuits.length === 0) return null;
+  return partnerNaturalSuits[partnerNaturalSuits.length - 1] ?? null;
 }
 
 function getCurrentWinningSeat(trick: Trick, trumpSuit: Suit | null): Seat {

@@ -1,6 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import type { Card, Trick } from '@goatbridge/shared';
+import type { BidCall, BiddingState, Card, Seat, Trick } from '@goatbridge/shared';
 import { selectDefenderCard } from './cardSelector.js';
+
+function makeBidding(calls: Array<{ seat: Seat; call: BidCall }>): BiddingState {
+  let currentBid: BiddingState['currentBid'] = null;
+  let doubleStatus: BiddingState['doubleStatus'] = 'none';
+  let passCount = 0;
+  for (const { call } of calls) {
+    if (call.type === 'bid') { currentBid = call; doubleStatus = 'none'; passCount = 0; }
+    else if (call.type === 'pass') passCount++;
+    else if (call.type === 'double') doubleStatus = 'doubled';
+    else if (call.type === 'redouble') doubleStatus = 'redoubled';
+  }
+  return { calls, currentBid, doubleStatus, passCount, isComplete: false, passedOut: false };
+}
 
 describe('selectDefenderCard - upside-down attitude on partner lead', () => {
   it('plays low to encourage when holding an honor and unable to beat', () => {
@@ -61,5 +74,33 @@ describe('selectDefenderCard - upside-down attitude on partner lead', () => {
 
     const card = selectDefenderCard(hand, trick, 'notrump', false, 'east', 'north', 'south');
     expect(card).toEqual({ suit: 'clubs', rank: 'A' });
+  });
+
+  it('uses auction memory on opening lead by preferring partner shown suit', () => {
+    const hand: Card[] = [
+      { suit: 'clubs', rank: 'A' },
+      { suit: 'clubs', rank: '7' },
+      { suit: 'clubs', rank: '4' },
+      { suit: 'diamonds', rank: 'K' },
+      { suit: 'diamonds', rank: '8' },
+      { suit: 'diamonds', rank: '6' },
+      { suit: 'diamonds', rank: '3' },
+      { suit: 'hearts', rank: 'Q' },
+      { suit: 'hearts', rank: '5' },
+      { suit: 'spades', rank: '9' },
+      { suit: 'spades', rank: '7' },
+      { suit: 'spades', rank: '4' },
+      { suit: 'spades', rank: '2' },
+    ];
+    const bidding = makeBidding([
+      { seat: 'south', call: { type: 'bid', level: 1, strain: 'notrump' } },
+      { seat: 'west', call: { type: 'pass' } },
+      { seat: 'north', call: { type: 'bid', level: 2, strain: 'diamonds' } },
+      { seat: 'east', call: { type: 'pass' } },
+      { seat: 'south', call: { type: 'bid', level: 3, strain: 'notrump' } },
+    ]);
+
+    const lead = selectDefenderCard(hand, null, 'notrump', true, 'east', 'south', 'north', bidding);
+    expect(lead.suit).toBe('diamonds');
   });
 });

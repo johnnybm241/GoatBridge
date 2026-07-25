@@ -1023,6 +1023,58 @@ function advancerAfterTakeoutDouble(
   return { type: 'pass' };
 }
 
+function findPendingTakeoutAdvance(
+  seat: Seat,
+  bidding: BiddingState,
+): LevelBid | null {
+  const seatIdx = SEATS.indexOf(seat);
+  const partnerSeat = SEATS[partnerIdx(seatIdx)]!;
+  const calls = bidding.calls;
+
+  const myLastCallIndex = [...calls]
+    .map((c, i) => ({ c, i }))
+    .reverse()
+    .find(x => x.c.seat === seat)?.i ?? -1;
+
+  const partnerDoubleIndex = [...calls]
+    .map((c, i) => ({ c, i }))
+    .reverse()
+    .find(x => x.i > myLastCallIndex && x.c.seat === partnerSeat && x.c.call.type === 'double')?.i;
+  if (partnerDoubleIndex === undefined) return null;
+
+  const doubledBidEntry = [...calls.slice(0, partnerDoubleIndex)].reverse().find(c => c.call.type === 'bid');
+  if (!doubledBidEntry || doubledBidEntry.call.type !== 'bid') return null;
+
+  // Only treat as takeout context when partner doubled an opponent's suit bid.
+  const doublerOpponents = new Set<Seat>([
+    SEATS[(SEATS.indexOf(partnerSeat) + 1) % 4]!,
+    SEATS[(SEATS.indexOf(partnerSeat) + 3) % 4]!,
+  ]);
+  if (!doublerOpponents.has(doubledBidEntry.seat as Seat)) return null;
+
+  return doubledBidEntry.call;
+}
+
+function applyAuctionMemoryGuardrails(
+  chosen: BidCall,
+  eval_: HandEvaluation,
+  seat: Seat,
+  bidding: BiddingState,
+): BidCall {
+  // Global guardrail: when partner has made a pending takeout double, don't pass with short trumps.
+  if (chosen.type === 'pass') {
+    const pendingTakeout = findPendingTakeoutAdvance(seat, bidding);
+    if (pendingTakeout && pendingTakeout.strain !== 'notrump') {
+      const oppSuit = pendingTakeout.strain as Suit;
+      if (eval_.shape[oppSuit] < 4) {
+        const forced = advancerAfterTakeoutDouble(eval_, pendingTakeout, bidding);
+        if (forced.type !== 'pass') return forced;
+      }
+    }
+  }
+  return chosen;
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Entry point
 // ────────────────────────────────────────────────────────────────────────────
@@ -1076,6 +1128,8 @@ export function chooseBid(
     default:
       chosen = { type: 'pass' };
   }
+
+  chosen = applyAuctionMemoryGuardrails(chosen, eval_, seat, bidding);
 
   // Safety net: if the chosen bid isn't legal (too low), fall back to pass.
   if (chosen.type === 'bid' && bidding.currentBid) {

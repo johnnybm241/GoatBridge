@@ -232,6 +232,17 @@ describe('SAYC bidder — overcalls & takeout doubles', () => {
     const bid = chooseBid(hand, 'east', bidding);
     expect(bid).toEqual({ type: 'pass' });
   });
+
+  it("still advances partner's takeout double after an intervening pass", () => {
+    const bidding = makeBidding([
+      { seat: 'south', call: { type: 'bid', level: 1, strain: 'spades' } },
+      { seat: 'west', call: { type: 'double' } },
+      { seat: 'north', call: { type: 'pass' } },
+    ]);
+    const hand = makeHand({ spades: '42', hearts: 'QJ873', diamonds: '764', clubs: 'K53' });
+    const bid = chooseBid(hand, 'east', bidding);
+    expect(bid.type).toBe('bid');
+  });
 });
 
 describe('SAYC bidder — safety net', () => {

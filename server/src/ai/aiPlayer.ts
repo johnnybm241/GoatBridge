@@ -83,6 +83,7 @@ export function scheduleAIAction(
           seat,
           currentGame.declarer,
           currentGame.dummy,
+          currentGame.bidding,
         );
       }
       logger.debug('AI play', { seat, card });
