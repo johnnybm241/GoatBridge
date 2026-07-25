@@ -177,8 +177,12 @@ export default function BridgeTable({
   const renderHandContent = (seat: Seat) => {
     const isDummySeat = dummy === seat && phase === 'playing' && dummyHand;
     const handCards = getHandForSeat(seat);
+    // Declarer plays both hands — show dummy as a regular fanned Hand so it
+    // takes the same shape/space as declarer's own hand. Defenders see the
+    // BBO-style row-per-suit DummyHand layout for readability.
+    const viewerIsDeclarer = yourSeat === declarer;
 
-    if (isDummySeat) {
+    if (isDummySeat && !viewerIsDeclarer) {
       return (
         <DummyHand
           cards={dummyHand}
