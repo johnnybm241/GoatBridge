@@ -290,13 +290,43 @@ export function explainBidAt(
   const priorBidsBySeatBefore = calls
     .slice(0, index)
     .filter(c => c.seat === seat && c.call.type === 'bid').length;
+  const priorNonPassCallsBySeatBefore = calls
+    .slice(0, index)
+    .filter(c => c.seat === seat && c.call.type !== 'pass').length;
 
   // Pre-opening / early passes
   if (call.type === 'pass') {
     if (openingIdx < 0 || index < openingIdx) return 'Pass: fewer than 12 HCP (or no biddable hand).';
     if (index === calls.length - 1 && bidding.passCount >= 3) return 'Pass: ends the auction.';
+    // Passing partner's takeout double converts it to penalty.
+    const priorCalls = calls.slice(0, index);
+    const lastNonPassIdx = [...priorCalls]
+      .map((entry, i) => ({ entry, i }))
+      .reverse()
+      .find(x => x.entry.call.type !== 'pass');
+    if (lastNonPassIdx && lastNonPassIdx.entry.call.type === 'double') {
+      const doubler = lastNonPassIdx.entry.seat as Seat;
+      const doublerPartner = partnerOf(doubler);
+      const beforeDouble = priorCalls.slice(0, lastNonPassIdx.i);
+      const doubledBidEntry = [...beforeDouble].reverse().find(c => c.call.type === 'bid');
+      if (
+        seat === doublerPartner &&
+        doubledBidEntry &&
+        doubledBidEntry.seat !== doubler &&
+        doubledBidEntry.seat !== doublerPartner
+      ) {
+        const doubledBid = doubledBidEntry.call as LevelBid;
+        const doubledSuit = doubledBid.strain === 'notrump'
+          ? 'notrump'
+          : STRAIN_NAME[doubledBid.strain];
+        if (doubledBid.strain === 'spades' || doubledBid.strain === 'hearts') {
+          return `Pass over partner's takeout double: converts to penalties, typically 4–5+ good ${doubledSuit} and defensive values.`;
+        }
+        return `Pass over partner's takeout double: converts to penalties, showing strong defense against ${doubledSuit}.`;
+      }
+    }
     // Seat has already bid — pass now means "nothing more to say", not a weak hand
-    if (priorBidsBySeatBefore > 0) {
+    if (priorNonPassCallsBySeatBefore > 0) {
       if (isOpener) return 'Opener passes: minimum opening, nothing more to describe.';
       if (isResponder) return 'Responder passes: has already limited the hand; no reason to bid again.';
       return 'Pass: has already described the hand; no reason to bid again.';
