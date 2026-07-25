@@ -127,9 +127,9 @@ function explainOpenerRebid(
     if (strain === 'diamonds' && level === opening.level + 1)
       return 'Stayman response: no 4-card major.';
     if (strain === 'hearts' && level === opening.level + 1)
-      return 'Stayman response: 4–5 hearts (says nothing about strength beyond the opening).';
+      return 'Stayman response: exactly 4 hearts (says nothing about strength beyond the opening).';
     if (strain === 'spades' && level === opening.level + 1)
-      return 'Stayman response: 4–5 spades (says nothing about strength beyond the opening).';
+      return 'Stayman response: exactly 4 spades (says nothing about strength beyond the opening).';
   }
 
   // Jump rebids
