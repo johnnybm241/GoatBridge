@@ -52,6 +52,16 @@ export function selectDefenderCard(
           // Partner is winning — play low to preserve honors
           return lowestCard(followSuitCards);
         }
+        const winnerCard = getCurrentWinnerCard(trick, trumpSuit);
+        const beatingCards = (trumpSuit && winnerCard.suit === trumpSuit)
+          ? []
+          : followSuitCards.filter(c => rankValue(c.rank) > rankValue(winnerCard.rank));
+        if (beatingCards.length > 0) return highestCard(beatingCards);
+
+        // UDCA (upside-down attitude): when partner leads and we cannot beat declarer,
+        // a low card encourages continuation; a high card discourages.
+        const encouraging = followSuitCards.some(c => HIGH_HONORS.has(c.rank));
+        return encouraging ? lowestCard(followSuitCards) : highestCard(followSuitCards);
       }
       return highestCard(followSuitCards);
     }
