@@ -206,6 +206,32 @@ describe('SAYC bidder — overcalls & takeout doubles', () => {
     const bid = chooseBid(hand, 'west', opp1S());
     expect(bid).toEqual({ type: 'pass' });
   });
+
+  it("after partner's takeout double, does not pass with only two trumps", () => {
+    // South opens 1S, West doubles (takeout), East must act.
+    const bidding = makeBidding([
+      { seat: 'south', call: { type: 'bid', level: 1, strain: 'spades' } },
+      { seat: 'west', call: { type: 'double' } },
+    ]);
+    // 7 HCP, only 2 spades, 5 hearts: should bid hearts (or another suit), not pass.
+    const hand = makeHand({ spades: '42', hearts: 'QJ873', diamonds: '764', clubs: 'K53' });
+    const bid = chooseBid(hand, 'east', bidding);
+    expect(bid.type).toBe('bid');
+    if (bid.type === 'bid') {
+      expect(bid.strain).not.toBe('spades');
+    }
+  });
+
+  it("after partner's takeout double, may pass with 4+ good trumps and values (penalty conversion)", () => {
+    const bidding = makeBidding([
+      { seat: 'south', call: { type: 'bid', level: 1, strain: 'spades' } },
+      { seat: 'west', call: { type: 'double' } },
+    ]);
+    // 9 HCP and 4-card spade holding with honors: pass to convert to penalties.
+    const hand = makeHand({ spades: 'AQ97', hearts: '842', diamonds: '763', clubs: 'K53' });
+    const bid = chooseBid(hand, 'east', bidding);
+    expect(bid).toEqual({ type: 'pass' });
+  });
 });
 
 describe('SAYC bidder — safety net', () => {

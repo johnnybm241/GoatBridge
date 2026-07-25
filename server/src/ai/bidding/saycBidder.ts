@@ -12,6 +12,11 @@ type Role =
   | { kind: 'opening' }
   | { kind: 'overcaller-first'; opening: { seat: Seat; call: LevelBid } }
   | { kind: 'responder-first'; opening: { seat: Seat; call: LevelBid }; interference: LevelBid | null }
+  | {
+      kind: 'advancer-after-takeout-double';
+      opening: { seat: Seat; call: LevelBid };
+      doubledBid: LevelBid;
+    }
   | { kind: 'advancer-first'; overcall: { seat: Seat; call: LevelBid }; opening: { seat: Seat; call: LevelBid } }
   | {
       kind: 'opener-rebid';
@@ -36,6 +41,17 @@ type Role =
 
 function partnerIdx(seatIdx: number): number {
   return (seatIdx + 2) % 4;
+}
+
+function minLegalLevelForStrain(
+  strain: Suit | 'notrump',
+  currentBid: LevelBid | null,
+): number {
+  if (!currentBid) return 1;
+  const strainOrder: (Suit | 'notrump')[] = ['clubs', 'diamonds', 'hearts', 'spades', 'notrump'];
+  const myIdx = strainOrder.indexOf(strain);
+  const oppIdx = strainOrder.indexOf(currentBid.strain);
+  return myIdx > oppIdx ? currentBid.level : currentBid.level + 1;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -246,6 +262,19 @@ function classifyRole(seat: Seat, bidding: BiddingState): Role {
   }
 
   // Opponent opened
+  const partnerFirstDoubleEntry = calls.find(c => c.seat === partnerSeat && c.call.type === 'double');
+  if (partnerFirstDoubleEntry && myPriorBids === 0) {
+    const partnerDoubleIdx = calls.indexOf(partnerFirstDoubleEntry);
+    const doubledBidEntry = [...calls.slice(0, partnerDoubleIdx)].reverse().find(c => c.call.type === 'bid');
+    if (doubledBidEntry && doubledBidEntry.call.type === 'bid') {
+      return {
+        kind: 'advancer-after-takeout-double',
+        opening: { seat: openerSeat, call: openingCall },
+        doubledBid: doubledBidEntry.call,
+      };
+    }
+  }
+
   const partnerOvercalled = partnersPriorBids.length > 0;
   if (partnerOvercalled && myPriorBids === 0) {
     // Find partner's overcall entry
@@ -954,6 +983,46 @@ function advancerFirst(
   return { type: 'pass' };
 }
 
+function advancerAfterTakeoutDouble(
+  eval_: HandEvaluation,
+  doubledBid: LevelBid,
+  bidding: BiddingState,
+): BidCall {
+  const { hcp, shape, stoppers } = eval_;
+  const oppSuit = doubledBid.strain !== 'notrump' ? (doubledBid.strain as Suit) : null;
+  if (!oppSuit) return { type: 'pass' };
+
+  // Penalty conversion: pass partner's takeout double only with real trump length + values.
+  if (shape[oppSuit] >= 4 && hcp >= 8) return { type: 'pass' };
+
+  const candidates = (['spades', 'hearts', 'diamonds', 'clubs'] as Suit[])
+    .filter(s => s !== oppSuit)
+    .sort((a, b) => {
+      if (shape[b] !== shape[a]) return shape[b] - shape[a];
+      const order: Suit[] = ['spades', 'hearts', 'diamonds', 'clubs'];
+      return order.indexOf(a) - order.indexOf(b);
+    });
+
+  const bestSuit = candidates[0] ?? null;
+  if (bestSuit) {
+    const minLevel = minLegalLevelForStrain(bestSuit, bidding.currentBid);
+    if (minLevel <= 7) {
+      // Jump with invitational values and real suit length.
+      if (hcp >= 10 && shape[bestSuit] >= 5 && minLevel + 1 <= 7) {
+        return { type: 'bid', level: (minLevel + 1) as 1 | 2 | 3 | 4 | 5 | 6 | 7, strain: bestSuit };
+      }
+      return { type: 'bid', level: minLevel as 1 | 2 | 3 | 4 | 5 | 6 | 7, strain: bestSuit };
+    }
+  }
+
+  if (hcp >= 8 && hcp <= 11 && stoppers[oppSuit]) {
+    const ntLevel = minLegalLevelForStrain('notrump', bidding.currentBid);
+    if (ntLevel <= 7) return { type: 'bid', level: ntLevel as 1 | 2 | 3 | 4 | 5 | 6 | 7, strain: 'notrump' };
+  }
+
+  return { type: 'pass' };
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Entry point
 // ────────────────────────────────────────────────────────────────────────────
@@ -997,6 +1066,9 @@ export function chooseBid(
       break;
     case 'overcaller-first':
       chosen = overcallerFirst(eval_, role.opening, bidding);
+      break;
+    case 'advancer-after-takeout-double':
+      chosen = advancerAfterTakeoutDouble(eval_, role.doubledBid, bidding);
       break;
     case 'advancer-first':
       chosen = advancerFirst(eval_, role.overcall);
