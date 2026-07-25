@@ -120,6 +120,18 @@ function explainOpenerRebid(
     if (answer) return answer;
   }
 
+  // Stayman response (1NT–2♣ or 2NT–3♣): opener answers his major holding, no extras implied
+  if (opening.strain === 'notrump' && responseByPartner
+      && responseByPartner.strain === 'clubs'
+      && responseByPartner.level === opening.level + 1) {
+    if (strain === 'diamonds' && level === opening.level + 1)
+      return 'Stayman response: no 4-card major.';
+    if (strain === 'hearts' && level === opening.level + 1)
+      return 'Stayman response: 4–5 hearts (says nothing about strength beyond the opening).';
+    if (strain === 'spades' && level === opening.level + 1)
+      return 'Stayman response: 4–5 spades (says nothing about strength beyond the opening).';
+  }
+
   // Jump rebids
   if (opening.strain !== 'notrump') {
     if (strain === opening.strain && level === opening.level + 1)
