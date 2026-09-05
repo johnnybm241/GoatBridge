@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getSocket, initSocket } from '../socket.js';
 import { useAuthStore } from '../store/authStore.js';
 import { useGameStore } from '../store/gameStore.js';
 import { APP_VERSION } from '../version.js';
 import api from '../api.js';
-import type { Seat } from '@goatbridge/shared';
+import type { Seat, SeatInfo, SpectatorInfo } from '@goatbridge/shared';
 import { SEATS } from '@goatbridge/shared';
 
 interface ActiveRoom {
@@ -19,10 +19,21 @@ export default function LobbyPage() {
   const [roomCode, setRoomCode] = useState('');
   const [spectate, setSpectate] = useState(false);
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const [activeRooms, setActiveRooms] = useState<ActiveRoom[]>([]);
   const navigate = useNavigate();
   const auth = useAuthStore();
   const gameStore = useGameStore();
+  const roomJoinedHandlerRef = useRef<((payload: {
+    roomCode: string;
+    hostUserId: string;
+    isSpectator: boolean;
+    seats: Record<Seat, SeatInfo>;
+    kibitzingAllowed: boolean;
+    spectators: SpectatorInfo[];
+  }) => void) | null>(null);
+  const roomErrorHandlerRef = useRef<((payload: { message: string }) => void) | null>(null);
+  const roomRequestTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Ensure socket is connected whenever we land on the lobby
   useEffect(() => {
@@ -43,58 +54,104 @@ export default function LobbyPage() {
       .catch(() => {});
   }, []);
 
-  const createRoom = () => {
-    setError('');
-    let socket: ReturnType<typeof getSocket>;
-    try {
-      socket = getSocket();
-    } catch {
-      socket = initSocket(auth.token!);
+  const clearRoomRequestHandlers = (socket: ReturnType<typeof getSocket>) => {
+    if (roomJoinedHandlerRef.current) {
+      socket.off('room_joined', roomJoinedHandlerRef.current);
+      roomJoinedHandlerRef.current = null;
     }
+    if (roomErrorHandlerRef.current) {
+      socket.off('room_error', roomErrorHandlerRef.current);
+      roomErrorHandlerRef.current = null;
+    }
+    if (roomRequestTimeoutRef.current) {
+      clearTimeout(roomRequestTimeoutRef.current);
+      roomRequestTimeoutRef.current = null;
+    }
+  };
 
-    // Listen for room_joined before emitting so we never miss it
-    socket.once('room_joined', (payload) => {
+  const setupRoomRequestHandlers = (socket: ReturnType<typeof getSocket>) => {
+    clearRoomRequestHandlers(socket);
+    const onJoined = (payload: {
+      roomCode: string;
+      hostUserId: string;
+      isSpectator: boolean;
+      seats: Record<Seat, SeatInfo>;
+      kibitzingAllowed: boolean;
+      spectators: SpectatorInfo[];
+    }) => {
+      clearRoomRequestHandlers(socket);
+      setSubmitting(false);
       gameStore.setRoom(payload.roomCode, payload.hostUserId, payload.isSpectator);
       gameStore.setRoomLobby(payload.seats, payload.kibitzingAllowed, payload.spectators);
       for (const s of SEATS) {
         if (payload.seats[s]?.userId === auth.userId) { gameStore.setYourSeat(s); break; }
       }
       navigate(`/game/${payload.roomCode}`);
-    });
-    socket.once('room_error', (payload) => {
+    };
+    const onError = (payload: { message: string }) => {
+      clearRoomRequestHandlers(socket);
+      setSubmitting(false);
       setError(payload.message);
-    });
+    };
+    roomJoinedHandlerRef.current = onJoined;
+    roomErrorHandlerRef.current = onError;
+    socket.on('room_joined', onJoined);
+    socket.on('room_error', onError);
+    roomRequestTimeoutRef.current = setTimeout(() => {
+      clearRoomRequestHandlers(socket);
+      setSubmitting(false);
+      setError('Unable to open table right now. Please try again.');
+    }, 8000);
+  };
 
+  const ensureSocket = (): ReturnType<typeof getSocket> => {
+    let socket: ReturnType<typeof getSocket>;
+    try {
+      socket = getSocket();
+    } catch {
+      socket = initSocket(auth.token!);
+    }
+    if (!socket.connected) socket.connect();
+    return socket;
+  };
+
+  useEffect(() => {
+    return () => {
+      try {
+        const socket = getSocket();
+        clearRoomRequestHandlers(socket);
+      } catch {
+        // No socket initialized; nothing to clean up.
+      }
+    };
+  }, []);
+
+  const createRoom = () => {
+    if (submitting) return;
+    setError('');
+    setSubmitting(true);
+    const socket = ensureSocket();
+    setupRoomRequestHandlers(socket);
     socket.emit('create_room');
   };
 
   const joinRoom = () => {
     if (!roomCode.trim()) { setError('Enter a room code'); return; }
+    if (submitting) return;
     setError('');
-    let socket: ReturnType<typeof getSocket>;
-    try {
-      socket = getSocket();
-    } catch {
-      socket = initSocket(auth.token!);
-    }
-
-    socket.once('room_joined', (payload) => {
-      gameStore.setRoom(payload.roomCode, payload.hostUserId, payload.isSpectator);
-      gameStore.setRoomLobby(payload.seats, payload.kibitzingAllowed, payload.spectators);
-      for (const s of SEATS) {
-        if (payload.seats[s]?.userId === auth.userId) { gameStore.setYourSeat(s); break; }
-      }
-      navigate(`/game/${payload.roomCode}`);
-    });
-    socket.once('room_error', (payload) => {
-      setError(payload.message);
-    });
-
-    socket.emit('join_room', { roomCode: roomCode.toUpperCase(), spectate });
+    setSubmitting(true);
+    const socket = ensureSocket();
+    setupRoomRequestHandlers(socket);
+    socket.emit('join_room', { roomCode: roomCode.trim().toUpperCase(), spectate });
   };
 
   const rejoinRoom = (code: string) => {
-    navigate(`/game/${code}`);
+    if (submitting) return;
+    setError('');
+    setSubmitting(true);
+    const socket = ensureSocket();
+    setupRoomRequestHandlers(socket);
+    socket.emit('join_room', { roomCode: code.toUpperCase(), spectate: false });
   };
 
   const phaseLabel = (phase: string, handNumber: number) => {
@@ -133,6 +190,7 @@ export default function LobbyPage() {
                   </div>
                   <button
                     onClick={() => rejoinRoom(room.roomCode)}
+                    disabled={submitting}
                     className="bg-gold hover:bg-gold/80 text-navy font-bold px-4 py-1.5 rounded-lg text-sm transition-colors"
                   >
                     Rejoin
@@ -151,9 +209,10 @@ export default function LobbyPage() {
           </p>
           <button
             onClick={createRoom}
+            disabled={submitting}
             className="w-full bg-gold hover:bg-gold-light text-navy font-bold py-3 rounded-lg transition-colors text-lg"
           >
-            Create Room
+            {submitting ? 'Opening…' : 'Create Room'}
           </button>
         </div>
 
@@ -175,15 +234,17 @@ export default function LobbyPage() {
                 type="checkbox"
                 checked={spectate}
                 onChange={e => setSpectate(e.target.checked)}
+                disabled={submitting}
                 className="accent-gold"
               />
               Join as spectator (kibitz)
             </label>
             <button
               onClick={joinRoom}
+              disabled={submitting}
               className="w-full bg-felt hover:bg-felt-light text-cream font-bold py-3 rounded-lg transition-colors border border-felt-light"
             >
-              Join Room
+              {submitting ? 'Opening…' : 'Join Room'}
             </button>
           </div>
           {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
