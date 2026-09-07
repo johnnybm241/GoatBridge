@@ -10,7 +10,7 @@ const router = Router();
 interface UserRow {
   id: string;
   username: string;
-  email: string;
+  email: string | null;
   password_hash: string;
   active_card_back_skin: string;
   goat_balance: number;
@@ -23,9 +23,10 @@ interface UserRow {
 
 router.post('/register', async (req, res) => {
   const { username, email, password } = req.body as { username?: string; email?: string; password?: string };
+  const normalizedEmail = email && email.trim() ? email.trim() : null;
 
-  if (!username || !email || !password) {
-    res.status(400).json({ error: 'username, email, and password are required' });
+  if (!username || !password) {
+    res.status(400).json({ error: 'username and password are required' });
     return;
   }
   if (username.length < 3 || username.length > 20) {
@@ -43,10 +44,12 @@ router.post('/register', async (req, res) => {
     return;
   }
 
-  const emailExisting = sqlite.get<UserRow>('SELECT id FROM users WHERE email = ?', [email]);
-  if (emailExisting) {
-    res.status(409).json({ error: 'Email already registered' });
-    return;
+  if (normalizedEmail) {
+    const emailExisting = sqlite.get<UserRow>('SELECT id FROM users WHERE email = ?', [normalizedEmail]);
+    if (emailExisting) {
+      res.status(409).json({ error: 'Email already registered' });
+      return;
+    }
   }
 
   const passwordHash = await hashPassword(password);
@@ -55,7 +58,7 @@ router.post('/register', async (req, res) => {
 
   sqlite.run(
     'INSERT INTO users (id, username, email, password_hash, active_card_back_skin, goat_balance, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [id, username, email, passwordHash, 'classic', 0, now],
+    [id, username, normalizedEmail, passwordHash, 'classic', 0, now],
   );
 
   const token = signToken({ userId: id, username });

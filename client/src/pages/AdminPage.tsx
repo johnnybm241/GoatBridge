@@ -5,7 +5,7 @@ import { useAuthStore } from '../store/authStore.js';
 interface AdminUser {
   id: string;
   username: string;
-  email: string;
+  email: string | null;
   goat_balance: number;
   bleats: number;
   hands_played: number;

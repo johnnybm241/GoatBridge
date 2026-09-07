@@ -6,7 +6,7 @@ export function runMigrations() {
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       username TEXT NOT NULL UNIQUE,
-      email TEXT NOT NULL UNIQUE,
+      email TEXT UNIQUE,
       password_hash TEXT NOT NULL,
       active_card_back_skin TEXT NOT NULL DEFAULT 'classic',
       default_convention_card_id TEXT,
@@ -102,6 +102,28 @@ export function runMigrations() {
       convention_card_id TEXT NOT NULL REFERENCES convention_cards(id)
     );
   `);
+
+  // Relax email to be optional: existing DBs created before this change have
+  // `email TEXT NOT NULL UNIQUE`, which SQLite can't alter in place. Rebuild
+  // the table from its own CREATE TABLE SQL (preserving every other column's
+  // type/constraints exactly) with only the email column's NOT NULL removed.
+  const usersColumnInfo = sqlite.all<{ name: string; notnull: number }>('PRAGMA table_info(users)');
+  const emailCol = usersColumnInfo.find(c => c.name === 'email');
+  if (emailCol && emailCol.notnull) {
+    const tableSql = sqlite.get<{ sql: string }>(
+      "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'users'",
+    );
+    if (tableSql?.sql) {
+      const columnNames = usersColumnInfo.map(c => c.name);
+      const newSql = tableSql.sql
+        .replace(/\bemail\s+TEXT\s+NOT\s+NULL\s+UNIQUE/i, 'email TEXT UNIQUE')
+        .replace(/^CREATE TABLE\s+users\b/i, 'CREATE TABLE users_new');
+      sqlite.exec(newSql);
+      sqlite.exec(`INSERT INTO users_new (${columnNames.join(', ')}) SELECT ${columnNames.join(', ')} FROM users;`);
+      sqlite.exec('DROP TABLE users;');
+      sqlite.exec('ALTER TABLE users_new RENAME TO users;');
+    }
+  }
 
   // Add new columns (safe: wrapped in try/catch since SQLite has no ADD COLUMN IF NOT EXISTS)
   try { sqlite.exec('ALTER TABLE users ADD COLUMN hands_played INTEGER NOT NULL DEFAULT 0'); } catch { /* already exists */ }

@@ -50,13 +50,12 @@ export default function RegisterPage() {
             />
           </div>
           <div>
-            <label className="block text-cream/80 text-sm mb-1">Email</label>
+            <label className="block text-cream/80 text-sm mb-1">Email (optional)</label>
             <input
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
               className="w-full bg-navy border border-gold/30 text-cream rounded-lg px-3 py-2 focus:outline-none focus:border-gold transition-colors"
-              required
             />
           </div>
           <div>
