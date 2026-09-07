@@ -13,13 +13,13 @@ interface CardProps {
 
 const SIZE_CLASSES = {
   sm: 'w-10 h-14 md:w-12 md:h-16 lg:w-14 lg:h-20 text-xs',
-  md: 'w-12 h-16 md:w-16 md:h-24 lg:w-20 lg:h-28 text-xs md:text-sm',
+  md: 'w-12 h-16 md:w-16 md:h-24 lg:w-20 lg:h-28 xl:w-24 xl:h-32 2xl:w-28 2xl:h-36 text-xs md:text-sm xl:text-base 2xl:text-lg',
   lg: 'w-10 h-14 sm:w-12 sm:h-[4.5rem] md:w-16 md:h-24 lg:w-20 lg:h-28 xl:w-24 xl:h-32 text-xs md:text-sm lg:text-base',
 };
 
 const CORNER_SUIT_SIZE = {
   sm: 'text-xs',
-  md: 'text-xs md:text-sm',
+  md: 'text-xs md:text-sm xl:text-base 2xl:text-lg',
   lg: 'text-xs sm:text-xs md:text-sm lg:text-base xl:text-lg',
 };
 
@@ -62,7 +62,7 @@ export default function Card({ card, onClick, playable = false, size = 'md', fac
         <div>{card.rank}</div>
         <div className={cornerSuitSize}>{symbol}</div>
       </div>
-      <div className={`${suitColor} text-center text-xs sm:text-sm md:text-base lg:text-lg leading-none`}>{symbol}</div>
+      <div className={`${suitColor} text-center text-xs sm:text-sm md:text-base lg:text-lg 2xl:text-xl leading-none`}>{symbol}</div>
     </div>
   );
 }
