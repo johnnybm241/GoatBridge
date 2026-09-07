@@ -60,6 +60,8 @@ export function scheduleAIAction(
           contract.strain,
           declarerPlayingDummy,
           currentGame.completedTricks,
+          currentGame.declarer,
+          currentGame.dummy,
         );
       } else if (isDummy) {
         // Dummy's cards are played by AI declarer — should not reach here in normal flow
@@ -70,6 +72,8 @@ export function scheduleAIAction(
           contract.strain,
           true,
           currentGame.completedTricks,
+          currentGame.declarer,
+          currentGame.dummy,
         );
       } else {
         // Defender

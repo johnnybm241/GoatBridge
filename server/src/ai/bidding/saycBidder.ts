@@ -3,6 +3,7 @@ import type { Card, Suit } from '@goatbridge/shared';
 import type { Seat } from '@goatbridge/shared';
 import { SEATS } from '@goatbridge/shared';
 import { evaluateHand, type HandEvaluation } from './handEvaluator.js';
+import { validateCall } from '../../game/bidding.js';
 
 const SUITS: Suit[] = ['clubs', 'diamonds', 'hearts', 'spades'];
 const MAJORS: Suit[] = ['hearts', 'spades'];
@@ -37,7 +38,8 @@ type Role =
       opening: LevelBid;
       response: LevelBid;
       openerRebid: BidCall | null;
-    };
+    }
+  | { kind: 'competitive-rebid'; opening: { seat: Seat; call: LevelBid } };
 
 function partnerIdx(seatIdx: number): number {
   return (seatIdx + 2) % 4;
@@ -52,6 +54,16 @@ function minLegalLevelForStrain(
   const myIdx = strainOrder.indexOf(strain);
   const oppIdx = strainOrder.indexOf(currentBid.strain);
   return myIdx > oppIdx ? currentBid.level : currentBid.level + 1;
+}
+
+function suitHonors(hand: Card[], suit: Suit): number {
+  return hand.filter(card => card.suit === suit && ['A', 'K', 'Q', 'J', '10'].includes(card.rank)).length;
+}
+
+function hasSoundOvercallSuit(hand: Card[], suit: Suit, length: number): boolean {
+  if (length >= 6) return true;
+  const honors = suitHonors(hand, suit);
+  return honors >= 2;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -288,8 +300,7 @@ function classifyRole(seat: Seat, bidding: BiddingState): Role {
   if (!partnerOvercalled && myPriorBids === 0) {
     return { kind: 'overcaller-first', opening: { seat: openerSeat, call: openingCall } };
   }
-  // Beyond first defensive bid — fall back to a safe pass logic in caller
-  return { kind: 'overcaller-first', opening: { seat: openerSeat, call: openingCall } };
+  return { kind: 'competitive-rebid', opening: { seat: openerSeat, call: openingCall } };
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -895,6 +906,7 @@ function openerSecondRebid(
 
 function overcallerFirst(
   eval_: HandEvaluation,
+  hand: Card[],
   opening: { seat: Seat; call: LevelBid },
   bidding: BiddingState,
 ): BidCall {
@@ -944,6 +956,7 @@ function overcallerFirst(
     for (const s of ['spades', 'hearts', 'diamonds', 'clubs'] as Suit[]) {
       if (s === oppSuit) continue;
       if (shape[s] < 5) continue;
+      if (!hasSoundOvercallSuit(hand, s, shape[s])) continue;
       const minLevel = minLegalLevel(s);
       if (minLevel > 3) continue;
       if (minLevel >= 2 && hcp < 10) continue; // 2-level overcalls need opening strength
@@ -970,6 +983,7 @@ function overcallerFirst(
 function advancerFirst(
   eval_: HandEvaluation,
   overcall: { seat: Seat; call: LevelBid },
+  bidding: BiddingState,
 ): BidCall {
   const { hcp, shape } = eval_;
   if (overcall.call.type !== 'bid') return { type: 'pass' };
@@ -977,9 +991,71 @@ function advancerFirst(
   if (!ocSuit) return { type: 'pass' };
   // Raise partner's overcall with 3+ support
   if (shape[ocSuit] >= 3) {
-    if (hcp >= 10) return { type: 'bid', level: overcall.call.level + 1 as 2|3|4, strain: ocSuit };
-    if (hcp >= 6) return { type: 'bid', level: overcall.call.level as 1|2|3, strain: ocSuit }; // no-op / preemptive
+    const simpleRaiseLevel = minLegalLevelForStrain(ocSuit, bidding.currentBid);
+    if (simpleRaiseLevel <= 7) {
+      if (hcp >= 10 && shape[ocSuit] >= 4 && simpleRaiseLevel + 1 <= 7) {
+        return { type: 'bid', level: (simpleRaiseLevel + 1) as 2 | 3 | 4 | 5 | 6 | 7, strain: ocSuit };
+      }
+      if (hcp >= 6) {
+        return { type: 'bid', level: simpleRaiseLevel as 1 | 2 | 3 | 4 | 5 | 6 | 7, strain: ocSuit };
+      }
+    }
   }
+  return { type: 'pass' };
+}
+
+function competitiveRebid(
+  eval_: HandEvaluation,
+  seat: Seat,
+  bidding: BiddingState,
+): BidCall {
+  const { hcp, shape } = eval_;
+  const partnerSeat = SEATS[partnerIdx(SEATS.indexOf(seat))]!;
+  const priorCalls = bidding.calls;
+  const myLastBid = [...priorCalls]
+    .reverse()
+    .find(entry => entry.seat === seat && entry.call.type === 'bid');
+
+  const partnerLastBid = [...priorCalls]
+    .reverse()
+    .find(entry => entry.seat === partnerSeat && entry.call.type === 'bid');
+  if (
+    partnerLastBid?.call.type === 'bid' &&
+    myLastBid?.call.type === 'bid' &&
+    partnerLastBid.call.strain === myLastBid.call.strain &&
+    partnerLastBid.call.strain !== 'notrump'
+  ) {
+    const suit = partnerLastBid.call.strain as Suit;
+    const gameLevel = suit === 'hearts' || suit === 'spades' ? 4 : 5;
+    if (bidding.currentBid?.strain === suit && bidding.currentBid.level < gameLevel && hcp >= 14) {
+      return { type: 'bid', level: gameLevel as 4 | 5, strain: suit };
+    }
+    return { type: 'pass' };
+  }
+
+  if (partnerLastBid?.call.type === 'bid' && partnerLastBid.call.strain !== 'notrump') {
+    const supportSuit = partnerLastBid.call.strain as Suit;
+    if (shape[supportSuit] >= 3 && hcp >= 6) {
+      const simpleRaiseLevel = minLegalLevelForStrain(supportSuit, bidding.currentBid);
+      if (simpleRaiseLevel <= 7) {
+        if (hcp >= 10 && shape[supportSuit] >= 4 && simpleRaiseLevel + 1 <= 7) {
+          return { type: 'bid', level: (simpleRaiseLevel + 1) as 2 | 3 | 4 | 5 | 6 | 7, strain: supportSuit };
+        }
+        return { type: 'bid', level: simpleRaiseLevel as 1 | 2 | 3 | 4 | 5 | 6 | 7, strain: supportSuit };
+      }
+    }
+  }
+
+  if (myLastBid?.call.type === 'bid' && myLastBid.call.strain !== 'notrump') {
+    const suit = myLastBid.call.strain as Suit;
+    if (shape[suit] >= 6 && hcp >= 8) {
+      const rebidLevel = minLegalLevelForStrain(suit, bidding.currentBid);
+      if (rebidLevel <= 7) {
+        return { type: 'bid', level: rebidLevel as 1 | 2 | 3 | 4 | 5 | 6 | 7, strain: suit };
+      }
+    }
+  }
+
   return { type: 'pass' };
 }
 
@@ -1117,13 +1193,16 @@ export function chooseBid(
       chosen = responderRebid(eval_, role.opening, role.response, role.openerRebid);
       break;
     case 'overcaller-first':
-      chosen = overcallerFirst(eval_, role.opening, bidding);
+      chosen = overcallerFirst(eval_, hand, role.opening, bidding);
       break;
     case 'advancer-after-takeout-double':
       chosen = advancerAfterTakeoutDouble(eval_, role.doubledBid, bidding);
       break;
     case 'advancer-first':
-      chosen = advancerFirst(eval_, role.overcall);
+      chosen = advancerFirst(eval_, role.overcall, bidding);
+      break;
+    case 'competitive-rebid':
+      chosen = competitiveRebid(eval_, seat, bidding);
       break;
     default:
       chosen = { type: 'pass' };
@@ -1131,12 +1210,15 @@ export function chooseBid(
 
   chosen = applyAuctionMemoryGuardrails(chosen, eval_, seat, bidding);
 
-  // Safety net: if the chosen bid isn't legal (too low), fall back to pass.
-  if (chosen.type === 'bid' && bidding.currentBid) {
-    const cb = bidding.currentBid;
-    const strainIdx = (s: string) => ['clubs', 'diamonds', 'hearts', 'spades', 'notrump'].indexOf(s);
-    const higher = chosen.level > cb.level || (chosen.level === cb.level && strainIdx(chosen.strain) > strainIdx(cb.strain));
-    if (!higher) return { type: 'pass' };
+  const validation = validateCall(chosen, bidding, SEATS.indexOf(seat));
+  if (!validation.valid) {
+    if (chosen.type === 'bid' && bidding.currentBid) {
+      const cb = bidding.currentBid;
+      const strainIdx = (s: string) => ['clubs', 'diamonds', 'hearts', 'spades', 'notrump'].indexOf(s);
+      const higher = chosen.level > cb.level || (chosen.level === cb.level && strainIdx(chosen.strain) > strainIdx(cb.strain));
+      if (!higher) return { type: 'pass' };
+    }
+    return { type: 'pass' };
   }
   return chosen;
 }

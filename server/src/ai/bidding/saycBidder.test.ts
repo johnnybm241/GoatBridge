@@ -243,6 +243,17 @@ describe('SAYC bidder — overcalls & takeout doubles', () => {
     const bid = chooseBid(hand, 'east', bidding);
     expect(bid.type).toBe('bid');
   });
+
+  it("raises partner's overcall with support instead of passing", () => {
+    const bidding = makeBidding([
+      { seat: 'south', call: { type: 'bid', level: 1, strain: 'diamonds' } },
+      { seat: 'west', call: { type: 'bid', level: 1, strain: 'hearts' } },
+      { seat: 'north', call: { type: 'pass' } },
+    ]);
+    const hand = makeHand({ spades: '842', hearts: 'Q973', diamonds: '764', clubs: 'A53' });
+    const bid = chooseBid(hand, 'east', bidding);
+    expect(bid).toEqual({ type: 'bid', level: 2, strain: 'hearts' });
+  });
 });
 
 describe('SAYC bidder — safety net', () => {
@@ -264,6 +275,21 @@ describe('SAYC bidder — safety net', () => {
       expect(higher).toBe(true);
     }
     // If not a bid, must be pass/double/redouble — all fine
+  });
+
+  it('never produces an illegal same-side double in late competition', () => {
+    const bidding = makeBidding([
+      { seat: 'north', call: { type: 'bid', level: 1, strain: 'hearts' } },
+      { seat: 'east', call: { type: 'bid', level: 1, strain: 'spades' } },
+      { seat: 'south', call: { type: 'pass' } },
+      { seat: 'west', call: { type: 'bid', level: 2, strain: 'spades' } },
+      { seat: 'north', call: { type: 'pass' } },
+      { seat: 'east', call: { type: 'bid', level: 3, strain: 'spades' } },
+      { seat: 'south', call: { type: 'pass' } },
+    ]);
+    const hand = makeHand({ spades: 'Q763', hearts: '42', diamonds: 'KJ76', clubs: 'K53' });
+    const bid = chooseBid(hand, 'west', bidding);
+    expect(bid).not.toEqual({ type: 'double' });
   });
 });
 

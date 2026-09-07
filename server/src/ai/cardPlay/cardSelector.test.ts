@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BidCall, BiddingState, Card, Seat, Trick } from '@goatbridge/shared';
-import { selectDefenderCard } from './cardSelector.js';
+import { selectDeclarerCard, selectDefenderCard } from './cardSelector.js';
 
 function makeBidding(calls: Array<{ seat: Seat; call: BidCall }>): BiddingState {
   let currentBid: BiddingState['currentBid'] = null;
@@ -102,5 +102,81 @@ describe('selectDefenderCard - upside-down attitude on partner lead', () => {
 
     const lead = selectDefenderCard(hand, null, 'notrump', true, 'east', 'south', 'north', bidding);
     expect(lead.suit).toBe('diamonds');
+  });
+
+  it('does not ruff when partner is already winning the trick', () => {
+    const hand: Card[] = [
+      { suit: 'spades', rank: '6' },
+      { suit: 'spades', rank: '3' },
+      { suit: 'clubs', rank: '2' },
+      { suit: 'diamonds', rank: '4' },
+    ];
+    const trick: Trick = {
+      leader: 'west',
+      winner: null,
+      cards: [
+        { seat: 'west', card: { suit: 'hearts', rank: 'K' } },
+        { seat: 'north', card: { suit: 'hearts', rank: '2' } },
+      ],
+    };
+
+    const card = selectDefenderCard(hand, trick, 'spades', false, 'east', 'south', 'north');
+    expect(card).toEqual({ suit: 'clubs', rank: '2' });
+  });
+
+  it('avoids leading an unsupported ace against a suit contract', () => {
+    const hand: Card[] = [
+      { suit: 'spades', rank: 'A' },
+      { suit: 'spades', rank: '7' },
+      { suit: 'spades', rank: '4' },
+      { suit: 'diamonds', rank: 'K' },
+      { suit: 'diamonds', rank: '8' },
+      { suit: 'diamonds', rank: '6' },
+      { suit: 'diamonds', rank: '3' },
+      { suit: 'hearts', rank: 'Q' },
+      { suit: 'hearts', rank: '5' },
+      { suit: 'clubs', rank: '9' },
+      { suit: 'clubs', rank: '7' },
+      { suit: 'clubs', rank: '4' },
+      { suit: 'clubs', rank: '2' },
+    ];
+
+    const lead = selectDefenderCard(hand, null, 'hearts', true, 'east', 'south', 'north');
+    expect(lead).toEqual({ suit: 'diamonds', rank: '3' });
+  });
+});
+
+describe('selectDeclarerCard - trump management', () => {
+  it('does not ruff partner winner from declarer side', () => {
+    const declarerHand: Card[] = [
+      { suit: 'spades', rank: '6' },
+      { suit: 'spades', rank: '3' },
+      { suit: 'clubs', rank: '2' },
+    ];
+    const dummyHand: Card[] = [
+      { suit: 'hearts', rank: 'A' },
+      { suit: 'diamonds', rank: 'K' },
+    ];
+    const trick: Trick = {
+      leader: 'north',
+      winner: null,
+      cards: [
+        { seat: 'north', card: { suit: 'hearts', rank: 'A' } },
+        { seat: 'east', card: { suit: 'hearts', rank: '3' } },
+        { seat: 'south', card: { suit: 'hearts', rank: '2' } },
+      ],
+    };
+
+    const card = selectDeclarerCard(
+      declarerHand,
+      dummyHand,
+      trick,
+      'spades',
+      false,
+      [],
+      'south',
+      'north',
+    );
+    expect(card).toEqual({ suit: 'clubs', rank: '2' });
   });
 });

@@ -14,6 +14,166 @@ const partnerOf = (seat: Seat): Seat => {
   return SEATS[(i + 2) % 4]!;
 };
 
+type Role =
+  | { kind: 'opening' }
+  | { kind: 'overcaller-first'; opening: { seat: Seat; call: LevelBid } }
+  | { kind: 'responder-first'; opening: { seat: Seat; call: LevelBid }; interference: LevelBid | null }
+  | {
+      kind: 'advancer-after-takeout-double';
+      opening: { seat: Seat; call: LevelBid };
+      doubledBid: LevelBid;
+    }
+  | { kind: 'advancer-first'; overcall: { seat: Seat; call: LevelBid }; opening: { seat: Seat; call: LevelBid } }
+  | {
+      kind: 'opener-rebid';
+      opening: LevelBid;
+      response: LevelBid | null;
+      interference: boolean;
+      interferenceBid: LevelBid | null;
+    }
+  | {
+      kind: 'opener-second-rebid';
+      opening: LevelBid;
+      response: LevelBid | null;
+      myRebid: BidCall | null;
+      partnerLatest: BidCall | null;
+    }
+  | {
+      kind: 'responder-rebid';
+      opening: LevelBid;
+      response: LevelBid;
+      openerRebid: BidCall | null;
+    }
+  | { kind: 'competitive-rebid'; opening: { seat: Seat; call: LevelBid } };
+
+function partnerIdx(seatIdx: number): number {
+  return (seatIdx + 2) % 4;
+}
+
+function createStateForCalls(calls: Array<{ seat: string; call: BidCall }>): BiddingState {
+  let currentBid: LevelBid | null = null;
+  let doubleStatus: BiddingState['doubleStatus'] = 'none';
+  let passCount = 0;
+  for (const { call } of calls) {
+    if (call.type === 'bid') {
+      currentBid = call;
+      doubleStatus = 'none';
+      passCount = 0;
+    } else if (call.type === 'double') {
+      doubleStatus = 'doubled';
+      passCount = 0;
+    } else if (call.type === 'redouble') {
+      doubleStatus = 'redoubled';
+      passCount = 0;
+    } else {
+      passCount++;
+    }
+  }
+  return {
+    calls,
+    currentBid,
+    doubleStatus,
+    passCount,
+    isComplete: false,
+    passedOut: false,
+  };
+}
+
+function classifyRole(seat: Seat, bidding: BiddingState): Role {
+  const seatIdx = SEATS.indexOf(seat);
+  const partnerSeat = SEATS[partnerIdx(seatIdx)]!;
+  const calls = bidding.calls;
+
+  const firstBidIdx = calls.findIndex(c => c.call.type === 'bid');
+  if (firstBidIdx === -1) return { kind: 'opening' };
+
+  const opener = calls[firstBidIdx]!;
+  const openingCall = opener.call as LevelBid;
+  const openerSeat = opener.seat as Seat;
+  const iOpened = openerSeat === seat;
+  const partnerOpened = openerSeat === partnerSeat;
+
+  const myPriorBids = calls.filter(c => c.seat === seat && c.call.type === 'bid').length;
+  const partnersPriorBids = calls
+    .filter(c => c.seat === partnerSeat && c.call.type === 'bid')
+    .map(c => c.call as LevelBid);
+
+  if (iOpened) {
+    const response = partnersPriorBids[0] ?? null;
+    const interference =
+      response
+        ? calls.slice(firstBidIdx + 1).findIndex(c => c.seat === partnerSeat && c.call.type === 'bid') > 0
+        : false;
+    if (myPriorBids === 1) {
+      const callsAfterOpen = calls.slice(firstBidIdx + 1);
+      const oppBidBeforeMe = callsAfterOpen
+        .filter(c => c.seat !== seat && c.seat !== partnerSeat && c.call.type === 'bid')
+        .map(c => c.call as LevelBid);
+      const interferenceBid = oppBidBeforeMe.length > 0 ? oppBidBeforeMe[oppBidBeforeMe.length - 1]! : null;
+      return { kind: 'opener-rebid', opening: openingCall, response, interference, interferenceBid };
+    }
+    const myBids = calls.filter(c => c.seat === seat && c.call.type === 'bid');
+    const myRebid = myBids[1] ? myBids[1]!.call : null;
+    const partnerLatestEntry = [...calls].reverse().find(c => c.seat === partnerSeat && c.call.type === 'bid');
+    const partnerLatest = partnerLatestEntry ? partnerLatestEntry.call : null;
+    return {
+      kind: 'opener-second-rebid',
+      opening: openingCall,
+      response,
+      myRebid,
+      partnerLatest,
+    };
+  }
+
+  if (partnerOpened) {
+    if (myPriorBids === 0) {
+      const interferenceEntry = calls
+        .slice(firstBidIdx + 1)
+        .find(c => c.seat !== seat && c.seat !== partnerSeat && c.call.type === 'bid');
+      const interference = interferenceEntry ? (interferenceEntry.call as LevelBid) : null;
+      return { kind: 'responder-first', opening: { seat: openerSeat, call: openingCall }, interference };
+    }
+    const myResponse = calls.find(c => c.seat === seat && c.call.type === 'bid');
+    const openerRebidEntry = calls
+      .slice((myResponse ? calls.indexOf(myResponse) : 0) + 1)
+      .find(c => c.seat === partnerSeat);
+    const openerRebid = openerRebidEntry ? openerRebidEntry.call : null;
+    return {
+      kind: 'responder-rebid',
+      opening: openingCall,
+      response: (myResponse!.call as LevelBid),
+      openerRebid,
+    };
+  }
+
+  const partnerFirstDoubleEntry = calls.find(c => c.seat === partnerSeat && c.call.type === 'double');
+  if (partnerFirstDoubleEntry && myPriorBids === 0) {
+    const partnerDoubleIdx = calls.indexOf(partnerFirstDoubleEntry);
+    const doubledBidEntry = [...calls.slice(0, partnerDoubleIdx)].reverse().find(c => c.call.type === 'bid');
+    if (doubledBidEntry && doubledBidEntry.call.type === 'bid') {
+      return {
+        kind: 'advancer-after-takeout-double',
+        opening: { seat: openerSeat, call: openingCall },
+        doubledBid: doubledBidEntry.call,
+      };
+    }
+  }
+
+  const partnerOvercalled = partnersPriorBids.length > 0;
+  if (partnerOvercalled && myPriorBids === 0) {
+    const overcallEntry = calls.find(c => c.seat === partnerSeat && c.call.type === 'bid')!;
+    return {
+      kind: 'advancer-first',
+      overcall: { seat: partnerSeat, call: overcallEntry.call as LevelBid },
+      opening: { seat: openerSeat, call: openingCall },
+    };
+  }
+  if (!partnerOvercalled && myPriorBids === 0) {
+    return { kind: 'overcaller-first', opening: { seat: openerSeat, call: openingCall } };
+  }
+  return { kind: 'competitive-rebid', opening: { seat: openerSeat, call: openingCall } };
+}
+
 function explainOpening(call: BidCall): string {
   if (call.type !== 'bid') return '';
   const { level, strain } = call;
@@ -80,6 +240,32 @@ function explainResponse(call: BidCall, opening: LevelBid, byPartner: boolean): 
   return `Bid ${level}${strain === 'notrump' ? 'NT' : STRAIN_NAME[strain]} in response to partner’s opening.`;
 }
 
+function explainResponderFirst(
+  call: BidCall,
+  opening: LevelBid,
+  interference: LevelBid | null,
+): string {
+  if (call.type === 'pass') {
+    if (opening.level === 2 && opening.strain === 'clubs') {
+      return 'Pass after partner’s strong 2♣ opening is not standard; responder is normally expected to bid 2♦ waiting or make a positive response.';
+    }
+    if (interference) {
+      return 'Pass: no suitable negative double, raise, or natural call over the interference.';
+    }
+    return explainResponse(call, opening, true);
+  }
+  if (call.type === 'double' && interference) {
+    const openSuit = opening.strain;
+    const oppSuit = interference.strain;
+    const unbidMajors = (['hearts', 'spades'] as const).filter(m => m !== openSuit && m !== oppSuit);
+    const shape = unbidMajors.length === 2
+      ? 'both majors'
+      : `the unbid major (${STRAIN_NAME[unbidMajors[0] ?? 'hearts']})`;
+    return `Negative double: takeout, showing 6+ HCP (usually 8+ at the 2-level) and ${shape}.`;
+  }
+  return explainResponse(call, opening, true);
+}
+
 function explainJacoby2NTAnswer(call: BidCall, opening: LevelBid): string | null {
   if (call.type !== 'bid') return null;
   if (opening.strain !== 'hearts' && opening.strain !== 'spades') return null;
@@ -112,6 +298,23 @@ function explainOpenerRebid(
   if (call.type === 'pass') return 'Pass: minimum opening, no game interest.';
   if (call.type !== 'bid') return 'Opener’s rebid.';
   const { level, strain } = call;
+
+  const isWeakOrPreemptiveSuitOpening =
+    opening.strain !== 'notrump' &&
+    ((opening.level === 2 && opening.strain !== 'clubs') || opening.level >= 3);
+  if (isWeakOrPreemptiveSuitOpening) {
+    if (strain === opening.strain) {
+      return `Further bid in opener’s preemptive suit: competing on extra length/tricks, not redefining the original weak range already shown.`;
+    }
+    if (strain === 'notrump') {
+      return 'Notrump by the preemptive opener: cooperating after a feature ask or showing a stopper, consistent with the original preempt.';
+    }
+    return `Further action by the preemptive opener: based on fit or playability, not a fresh opening-strength description.`;
+  }
+
+  if (opening.level === 2 && opening.strain === 'clubs') {
+    return 'Strong 2♣ opener continuing the game-forcing auction, clarifying suit or notrump direction.';
+  }
 
   // Jacoby 2NT answer
   if (responseByPartner && responseByPartner.strain === 'notrump' && responseByPartner.level === 2
@@ -233,6 +436,64 @@ function explainOvercall(call: BidCall, opening: LevelBid): string {
   return `Overcall ${level}${strain === 'notrump' ? 'NT' : STRAIN_NAME[strain]}.`;
 }
 
+function explainAdvancerAfterTakeoutDouble(call: BidCall, doubledBid: LevelBid): string {
+  if (call.type === 'pass') {
+    return `Pass over partner’s takeout double: converts the double to penalties, showing defense against ${callTextFromBid(doubledBid)}.`;
+  }
+  if (call.type === 'bid') {
+    if (call.strain === 'notrump') {
+      return `Notrump advance of partner’s takeout double: shows a stopper in ${STRAIN_NAME[doubledBid.strain]} and constructive values.`;
+    }
+    if (call.level >= 2 && call.level > doubledBid.level) {
+      return `Jump advance after partner’s takeout double: invitational+ values with a real suit.`;
+    }
+    return `Cheapest advance of partner’s takeout double: choose the longest unbid suit, even with modest values.`;
+  }
+  return 'Response to partner’s takeout double.';
+}
+
+function explainAdvancerFirst(call: BidCall, overcall: LevelBid): string {
+  if (call.type === 'pass') return 'Pass: no suitable raise or constructive advance of partner’s overcall.';
+  if (call.type === 'bid' && call.strain === overcall.strain) {
+    if (call.level === overcall.level + 1) {
+      return `Simple raise of partner’s overcall: 3+ card support, competitive values.`;
+    }
+    if (call.level >= overcall.level + 2) {
+      return `Jump raise of partner’s overcall: 4+ card support and invitational or better values.`;
+    }
+  }
+  return `Constructive advance of partner’s overcall in ${call.type === 'bid' ? (call.strain === 'notrump' ? 'NT' : STRAIN_NAME[call.strain]) : 'the chosen strain'}.`;
+}
+
+function explainCompetitiveRebid(
+  call: BidCall,
+  calls: BiddingState['calls'],
+  seat: Seat,
+  index: number,
+): string {
+  if (call.type === 'pass') return 'Pass: already described the hand and has nothing further to add competitively.';
+  if (call.type === 'double') return 'Competitive double: extra values consistent with the hand already shown earlier in the auction.';
+  if (call.type === 'redouble') return 'Competitive redouble: extra values consistent with earlier action.';
+  const partnerSeat = partnerOf(seat);
+  const partnerLastBid = [...calls.slice(0, index)]
+    .reverse()
+    .find(entry => entry.seat === partnerSeat && entry.call.type === 'bid');
+  if (partnerLastBid?.call.type === 'bid' && call.strain === partnerLastBid.call.strain) {
+    return `Further raise of partner’s suit: competitive support, building on the partnership’s earlier fit.`;
+  }
+  const myLastBid = [...calls.slice(0, index)]
+    .reverse()
+    .find(entry => entry.seat === seat && entry.call.type === 'bid');
+  if (myLastBid?.call.type === 'bid' && call.strain === myLastBid.call.strain) {
+    return `Further rebid in ${call.strain === 'notrump' ? 'NT' : STRAIN_NAME[call.strain]}: competing on known length rather than redefining the hand.`;
+  }
+  return `Competitive action in ${call.strain === 'notrump' ? 'NT' : STRAIN_NAME[call.strain]}: consistent with the hand already described earlier.`;
+}
+
+function callTextFromBid(call: LevelBid): string {
+  return `${call.level}${call.strain === 'notrump' ? 'NT' : STRAIN_NAME[call.strain]}`;
+}
+
 function explainOvercallerRebid(
   call: BidCall,
   calls: BiddingState['calls'],
@@ -280,6 +541,8 @@ export function explainBidAt(
   const opening = openingEntry?.call.type === 'bid' ? openingEntry.call : null;
   const openerSeat = openingEntry ? (openingEntry.seat as Seat) : null;
   const openerPartner = openerSeat ? partnerOf(openerSeat) : null;
+  const priorState = createStateForCalls(calls.slice(0, index));
+  const role = classifyRole(seat, priorState);
 
   // Classify sides
   const isOpener = openerSeat && seat === openerSeat;
@@ -327,6 +590,9 @@ export function explainBidAt(
     }
     // Seat has already bid — pass now means "nothing more to say", not a weak hand
     if (priorNonPassCallsBySeatBefore > 0) {
+      if (role.kind === 'competitive-rebid') {
+        return 'Pass: earlier action already described the hand; nothing further to say competitively.';
+      }
       if (isOpener) return 'Opener passes: minimum opening, nothing more to describe.';
       if (isResponder) return 'Responder passes: has already limited the hand; no reason to bid again.';
       return 'Pass: has already described the hand; no reason to bid again.';
@@ -341,6 +607,9 @@ export function explainBidAt(
 
   // Doubles / redoubles have their own SAYC rules
   if (call.type === 'double') {
+    if (role.kind === 'competitive-rebid' || priorNonPassCallsBySeatBefore > 0) {
+      return 'Competitive double: extra values consistent with the hand already shown earlier in the auction.';
+    }
     const lastBid = [...calls.slice(0, index)].reverse().find(c => c.call.type === 'bid');
     // Negative double: partner opened 1X, RHO overcalled, I doubled.
     if (openingIdx >= 0 && isResponder && priorBidsBySeatBefore === 0 && lastBid) {
@@ -454,26 +723,15 @@ export function explainBidAt(
   const priorBidsBySeat = priorBidsBySeatBefore;
 
   if (isDefensive) {
-    const partnerSeat = partnerOf(seat);
-    const partnerAlreadyBid = calls
-      .slice(0, index)
-      .some(c => c.seat === partnerSeat && c.call.type === 'bid');
-    if (priorBidsBySeat === 0 && !partnerAlreadyBid) return explainOvercall(call, opening);
-    if (priorBidsBySeat === 0 && partnerAlreadyBid) {
-      const partnerBid = calls
-        .slice(0, index)
-        .filter(c => c.seat === partnerSeat && c.call.type === 'bid')
-        .pop();
-      const pb = partnerBid && partnerBid.call.type === 'bid' ? partnerBid.call : null;
-      if (call.type === 'bid' && pb && call.strain === pb.strain) {
-        if (call.level === pb.level + 1)
-          return `Raising partner's overcall in ${STRAIN_NAME[call.strain as keyof typeof STRAIN_NAME] ?? call.strain}: 3+ card support, competitive (6–9 HCP).`;
-        if (call.level >= pb.level + 2)
-          return `Jump raise of partner's overcall: 10+ HCP with support, invitational.`;
-      }
-      if (call.type === 'bid')
-        return `Advance in ${call.strain === 'notrump' ? 'NT' : STRAIN_NAME[call.strain as keyof typeof STRAIN_NAME]}: new suit response to partner's overcall (constructive, not forcing).`;
-      return 'Advancer pass: no fit and no bid available.';
+    if (role.kind === 'overcaller-first') return explainOvercall(call, opening);
+    if (role.kind === 'advancer-after-takeout-double') {
+      return explainAdvancerAfterTakeoutDouble(call, role.doubledBid);
+    }
+    if (role.kind === 'advancer-first') {
+      return explainAdvancerFirst(call, role.overcall.call);
+    }
+    if (role.kind === 'competitive-rebid') {
+      return explainCompetitiveRebid(call, calls, seat, index);
     }
     return explainOvercallerRebid(call, calls, seat, index);
   }
@@ -502,6 +760,9 @@ export function explainBidAt(
   }
 
   // Responder
+  if (role.kind === 'responder-first') {
+    return explainResponderFirst(call, role.opening.call, role.interference);
+  }
   if (priorBidsBySeat === 0) return explainResponse(call, opening, true);
   // Responder rebid — pass opener rebid context for NMF detection
   const myResponseEntry = calls.slice(0, index).find(c => c.seat === seat && c.call.type === 'bid');

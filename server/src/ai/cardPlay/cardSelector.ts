@@ -80,11 +80,23 @@ export function selectDefenderCard(
   // Can't follow suit - try to trump
   if (trumpSuit) {
     const trumps = hand.filter(c => c.suit === trumpSuit);
-    if (trumps.length > 0) return lowestCard(trumps);
+    if (trumps.length > 0) {
+      const winningSeat = getCurrentWinningSeat(trick, trumpSuit);
+      if (winningSeat === partner) {
+        return discardCard(hand, trumpSuit);
+      }
+      const winnerCard = getCurrentWinnerCard(trick, trumpSuit);
+      if (winnerCard.suit === trumpSuit) {
+        const overtrumps = trumps.filter(c => rankValue(c.rank) > rankValue(winnerCard.rank));
+        if (overtrumps.length > 0) return lowestCard(overtrumps);
+        return discardCard(hand, trumpSuit);
+      }
+      return lowestCard(trumps);
+    }
   }
 
   // Discard lowest card
-  return lowestCard(hand);
+  return discardCard(hand, trumpSuit);
 }
 
 export function selectDeclarerCard(
@@ -94,6 +106,8 @@ export function selectDeclarerCard(
   trumpStrain: Strain,
   isPlayingDummy: boolean,
   completedTricks: Trick[] = [],
+  declarer: Seat | null = null,
+  dummy: Seat | null = null,
 ): Card {
   const activeHand = isPlayingDummy ? dummyHand : hand;
   if (activeHand.length === 0) throw new Error('Empty hand');
@@ -140,11 +154,23 @@ export function selectDeclarerCard(
   }
 
   // Discard or trump
-  if (trumpSuit && trick.cards[trick.cards.length - 1]?.card.suit !== trumpSuit) {
+  if (trumpSuit) {
     const trumps = activeHand.filter(c => c.suit === trumpSuit);
-    if (trumps.length > 0) return lowestCard(trumps);
+    if (trumps.length > 0) {
+      const winningCard = getCurrentWinnerCard(trick, trumpSuit);
+      const currentWinner = getCurrentWinningSeat(trick, trumpSuit);
+      const declarerWinning = declarer !== null && dummy !== null &&
+        (currentWinner === declarer || currentWinner === dummy);
+      if (declarerWinning) return discardCard(activeHand, trumpSuit);
+      if (winningCard.suit === trumpSuit) {
+        const overtrumps = trumps.filter(c => rankValue(c.rank) > rankValue(winningCard.rank));
+        if (overtrumps.length > 0) return lowestCard(overtrumps);
+        return discardCard(activeHand, trumpSuit);
+      }
+      return lowestCard(trumps);
+    }
   }
-  return lowestCard(activeHand);
+  return discardCard(activeHand, trumpSuit);
 }
 
 function openingLead(
@@ -169,7 +195,9 @@ function openingLead(
     const partnerSuitCards = [...suitCounts[partnerSuit]].sort((a, b) => rankValue(b.rank) - rankValue(a.rank));
     if (partnerSuitCards.length >= 3) {
       if (isNT && partnerSuitCards.length >= 4) return partnerSuitCards[3]!;
-      return partnerSuitCards[0]!;
+      const partnerSequenceLead = sequenceLead(partnerSuitCards);
+      if (partnerSequenceLead) return partnerSequenceLead;
+      return lowestCard(partnerSuitCards);
     }
   }
 
@@ -187,6 +215,9 @@ function openingLead(
   }
 
   const suitCards = suitCounts[bestSuit].sort((a, b) => rankValue(b.rank) - rankValue(a.rank));
+  if (suitCards.length === 0) {
+    return lowestCard(hand);
+  }
 
   if (isNT && suitCards.length >= 4) {
     // 4th best
@@ -194,13 +225,34 @@ function openingLead(
   }
 
   // Top of sequence
-  if (suitCards.length >= 2) {
-    if (rankValue(suitCards[0]!.rank) - rankValue(suitCards[1]!.rank) === 1) {
-      return suitCards[0]!;
-    }
+  const sequence = sequenceLead(suitCards);
+  if (sequence) {
+    return sequence;
   }
 
-  return suitCards[0] ?? lowestCard(hand);
+  if (!isNT) {
+    const singletons = Object.values(suitCounts)
+      .filter(cards => cards.length === 1 && cards[0]!.rank !== 'A')
+      .map(cards => cards[0]!);
+    if (singletons.length > 0) {
+      return lowestCard(singletons);
+    }
+    if (suitCards[0]!.rank === 'A') {
+      const suitHasBackingHonor = suitCards.some(card => card.rank === 'K' || card.rank === 'Q');
+      if (!suitHasBackingHonor) {
+        const alternatives = (Object.entries(suitCounts) as [Suit, Card[]][])
+          .filter(([suit, cards]) => suit !== bestSuit && cards.length > 0)
+          .sort((a, b) => b[1].length - a[1].length);
+        if (alternatives.length > 0) {
+          return lowestCard(alternatives[0]![1]);
+        }
+      }
+      return lowestCard(suitCards);
+    }
+    return lowestCard(suitCards);
+  }
+
+  return suitCards[0] ?? discardCard(hand, trumpSuit);
 }
 
 function getPartnerShownSuit(
@@ -257,6 +309,18 @@ function getCurrentWinnerCard(trick: Trick, trumpSuit: Suit | null): Card {
     }
   }
   return winner;
+}
+
+function sequenceLead(cards: Card[]): Card | null {
+  if (cards.length < 2) return null;
+  if (rankValue(cards[0]!.rank) - rankValue(cards[1]!.rank) === 1) return cards[0]!;
+  return null;
+}
+
+function discardCard(hand: Card[], trumpSuit: Suit | null): Card {
+  const nonTrump = trumpSuit ? hand.filter(card => card.suit !== trumpSuit) : hand;
+  if (nonTrump.length > 0) return lowestCard(nonTrump);
+  return lowestCard(hand);
 }
 
 function findLongestSuit(hand: Card[]): Suit {
