@@ -61,6 +61,15 @@ export function runMigrations() {
       created_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS friend_requests (
+      id TEXT PRIMARY KEY,
+      requester_id TEXT NOT NULL REFERENCES users(id),
+      addressee_id TEXT NOT NULL REFERENCES users(id),
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at INTEGER NOT NULL,
+      responded_at INTEGER
+    );
+
     CREATE TABLE IF NOT EXISTS rooms (
       id TEXT PRIMARY KEY,
       room_code TEXT NOT NULL UNIQUE,

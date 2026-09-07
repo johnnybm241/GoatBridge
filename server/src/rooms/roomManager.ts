@@ -136,4 +136,34 @@ export function isFull(room: GameRoom): boolean {
   return SEATS.every(s => room.seats[s].userId !== null || room.seats[s].isAI);
 }
 
+/** Scans all in-memory rooms for where a user is currently seated or spectating. */
+export function findUserRoomPresence(userId: string): {
+  roomCode: string;
+  seat: Seat | null;
+  isSpectator: boolean;
+  kibitzingAllowed: boolean;
+  phase: string;
+  occupants: { seat: Seat; displayName: string; isAI: boolean }[];
+} | null {
+  for (const [code, room] of rooms) {
+    const seat = findSeatByUserId(room, userId);
+    const isSpectating = !seat && room.spectators.some(s => s.userId === userId);
+    if (!seat && !isSpectating) continue;
+
+    const occupants = SEATS
+      .filter(s => room.seats[s].userId)
+      .map(s => ({ seat: s, displayName: room.seats[s].displayName, isAI: room.seats[s].isAI }));
+
+    return {
+      roomCode: code,
+      seat: seat ?? null,
+      isSpectator: isSpectating,
+      kibitzingAllowed: room.kibitzingAllowed,
+      phase: room.game?.phase ?? 'waiting',
+      occupants,
+    };
+  }
+  return null;
+}
+
 export { rooms };

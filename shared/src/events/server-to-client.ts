@@ -223,6 +223,17 @@ export interface TournamentErrorPayload {
   message: string;
 }
 
+export interface FriendRequestReceivedPayload {
+  id: string;
+  userId: string;
+  username: string;
+}
+
+export interface FriendRequestAcceptedPayload {
+  userId: string;
+  username: string;
+}
+
 export interface ServerToClientEvents {
   room_joined: (payload: RoomJoinedPayload) => void;
   room_updated: (payload: RoomUpdatedPayload) => void;
@@ -258,6 +269,8 @@ export interface ServerToClientEvents {
   claim_requested: (payload: ClaimRequestedPayload) => void;
   claim_result: (payload: ClaimResultPayload) => void;
   bleats_awarded: (payload: BleatsAwardedPayload) => void;
+  friend_request_received: (payload: FriendRequestReceivedPayload) => void;
+  friend_request_accepted: (payload: FriendRequestAcceptedPayload) => void;
   team_match_state: (payload: TeamMatchStatePayload) => void;
   team_match_updated: (payload: TeamMatchStatePayload) => void;
   team_match_started: (payload: TeamMatchStartedPayload) => void;

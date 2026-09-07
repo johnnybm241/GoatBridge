@@ -1,16 +1,27 @@
 import { Link, useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth.js';
 import { useAuthStore } from '../store/authStore.js';
+import { useFriendsStore } from '../store/friendsStore.js';
 import { useSocketEvents } from '../hooks/useSocket.js';
 import { APP_VERSION } from '../version.js';
 import { getRank } from '@goatbridge/shared';
+import api from '../api.js';
 
 export default function NavBar() {
   const { username, goatBalance, logout } = useAuth();
   const bleats = useAuthStore(s => s.bleats);
   const isAdmin = useAuthStore(s => s.isAdmin);
+  const pendingRequestCount = useFriendsStore(s => s.pendingRequestCount);
+  const setPendingRequestCount = useFriendsStore(s => s.setPendingRequestCount);
   const rank = getRank(bleats);
   useSocketEvents();
+
+  useEffect(() => {
+    api.get<{ incoming: unknown[] }>('/friends/requests')
+      .then(r => setPendingRequestCount(r.data.incoming.length))
+      .catch(() => {});
+  }, []);
 
   return (
     <nav className="bg-navy border-b border-gold/30 px-4 py-2 flex items-center justify-between z-50 relative">
@@ -25,6 +36,14 @@ export default function NavBar() {
         <Link to="/" className="text-cream/80 hover:text-cream text-sm transition-colors">Lobby</Link>
         <Link to="/conventions" className="hidden md:inline text-cream/80 hover:text-cream text-sm transition-colors">Conventions</Link>
         <Link to="/partnerships" className="hidden md:inline text-cream/80 hover:text-cream text-sm transition-colors">Partners</Link>
+        <Link to="/friends" className="hidden md:inline relative text-cream/80 hover:text-cream text-sm transition-colors">
+          Friends
+          {pendingRequestCount > 0 && (
+            <span className="absolute -top-2 -right-3 bg-gold text-navy text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+              {pendingRequestCount > 9 ? '9+' : pendingRequestCount}
+            </span>
+          )}
+        </Link>
         <Link to="/team-matches" className="hidden sm:inline text-cream/80 hover:text-cream text-sm transition-colors">Teams</Link>
         <Link to="/tournaments" className="hidden sm:inline text-cream/80 hover:text-cream text-sm transition-colors">Tournaments</Link>
         <Link to="/history" className="hidden sm:inline text-cream/80 hover:text-cream text-sm transition-colors">History</Link>

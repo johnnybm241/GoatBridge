@@ -14,6 +14,8 @@ import teamMatchRoutes from './teamMatches/routes.js';
 import adminRoutes from './admin/routes.js';
 import tournamentRoutes from './tournaments/routes.js';
 import historyRoutes from './history/routes.js';
+import friendRoutes from './friends/routes.js';
+import playerRoutes from './players/routes.js';
 
 // Run DB migrations on startup
 runMigrations();
@@ -38,11 +40,14 @@ app.use('/team-matches', teamMatchRoutes);
 app.use('/admin', adminRoutes);
 app.use('/tournaments', tournamentRoutes);
 app.use('/history', historyRoutes);
+app.use('/friends', friendRoutes);
+app.use('/players', playerRoutes);
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
 // Socket.io
-createSocketServer(httpServer);
+const io = createSocketServer(httpServer);
+app.set('io', io);
 
 httpServer.listen(config.port, () => {
   console.log(`GoatBridge server running on port ${config.port}`);

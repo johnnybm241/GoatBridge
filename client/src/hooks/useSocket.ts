@@ -4,6 +4,7 @@ import { useGameStore } from '../store/gameStore.js';
 import { useAuthStore } from '../store/authStore.js';
 import { useTeamMatchStore } from '../store/teamMatchStore.js';
 import { useTournamentStore } from '../store/tournamentStore.js';
+import { useFriendsStore } from '../store/friendsStore.js';
 import type { Seat, SeatInfo } from '@goatbridge/shared';
 import { SEATS } from '@goatbridge/shared';
 
@@ -230,6 +231,14 @@ export function useSocketEvents() {
       // tournament_updated already carries the completed state
     });
 
+    socket.on('friend_request_received', (_payload) => {
+      useFriendsStore.getState().incrementPendingRequestCount();
+    });
+
+    socket.on('friend_request_accepted', (_payload) => {
+      // No persistent UI state needed here beyond a toast; kept minimal for now.
+    });
+
     return () => {
       registered.current = false;
       socket.off('room_joined');
@@ -258,6 +267,8 @@ export function useSocketEvents() {
       socket.off('tournament_state');
       socket.off('tournament_updated');
       socket.off('tournament_complete');
+      socket.off('friend_request_received');
+      socket.off('friend_request_accepted');
     };
   }, []);
 }

@@ -8,6 +8,7 @@ export * from './types/conventions.js';
 export * from './types/progression.js';
 export * from './types/teamMatch.js';
 export * from './types/tournament.js';
+export * from './types/social.js';
 
 // Events
 export * from './events/client-to-server.js';
