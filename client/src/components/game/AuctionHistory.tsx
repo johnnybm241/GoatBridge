@@ -57,13 +57,13 @@ export default function AuctionHistory({ bidding, dealer, vulnerability, seats }
   }
 
   return (
-    <div className="bg-navy/80 border border-gold/20 rounded-lg p-5 min-w-[220px]">
-      <div className="text-gold text-lg font-bold text-center mb-3">Auction</div>
-      <table className="w-full table-fixed text-center text-lg">
+    <div className="bg-navy/80 border border-gold/20 rounded-lg p-3 sm:p-5 w-full max-w-[280px] mx-auto">
+      <div className="text-gold text-base sm:text-lg font-bold text-center mb-3">Auction</div>
+      <table className="w-full table-fixed text-center text-base sm:text-lg">
         <thead>
           <tr>
             {COLUMN_LABELS.map((h, ci) => (
-              <th key={h} className={`font-bold w-1/4 pb-2 text-lg ${isVul(COLUMN_SEATS[ci]!, vulnerability) ? 'text-red-500' : 'text-cream/50'}`}>
+              <th key={h} className={`font-bold w-1/4 pb-2 text-base sm:text-lg ${isVul(COLUMN_SEATS[ci]!, vulnerability) ? 'text-red-500' : 'text-cream/50'}`}>
                 {h}
               </th>
             ))}
@@ -74,13 +74,13 @@ export default function AuctionHistory({ bidding, dealer, vulnerability, seats }
             <tr key={ri}>
               {[0,1,2,3].map(ci => {
                 const cell = row[ci];
-                if (!cell) return <td key={ci} className="py-2 px-4 text-cream/90" />;
+                if (!cell) return <td key={ci} className="py-1.5 px-2 sm:py-2 sm:px-4 text-cream/90" />;
                 const title = explainBidAt(cell.index, bidding, cell.seat);
                 return (
                   <td
                     key={ci}
                     title={title}
-                    className="py-2 px-4 text-cream/90 cursor-help underline decoration-dotted decoration-gold/40 underline-offset-4"
+                    className="py-1.5 px-2 sm:py-2 sm:px-4 text-cream/90 cursor-help underline decoration-dotted decoration-gold/40 underline-offset-4"
                   >
                     {formatCall(cell.call)}
                   </td>

@@ -230,13 +230,6 @@ export function setupGameHandlers(
     if (seat !== game.declarer && seat !== game.dummy) return;
     if (game.pendingClaim) return; // already pending
 
-    // Server-side validation — reject false claims immediately
-    if (!validateClaimAllTricks(room)) {
-      logger.info('Claim rejected (invalid)', { roomCode: payload.roomCode, seat });
-      socket.emit('claim_result', { accepted: false });
-      return;
-    }
-
     // Determine if any human opponents exist
     const declarer = game.declarer!;
     const dummy = game.dummy!;
@@ -244,18 +237,25 @@ export function setupGameHandlers(
     const humanOpps = oppSeats.filter(s => !game.seats[s].isAI && game.seats[s].userId);
 
     if (humanOpps.length === 0) {
-      // All opponents are bots — settle immediately
+      // All opponents are bots — they can't judge the claim themselves, so the
+      // server validates it before auto-settling to avoid an unfair auto-win.
+      if (!validateClaimAllTricks(room)) {
+        logger.info('Claim rejected (invalid, bot opponents)', { roomCode: payload.roomCode, seat });
+        socket.emit('claim_result', { accepted: false });
+        return;
+      }
       logger.info('Claim auto-settled (bot opponents)', { roomCode: payload.roomCode, seat });
       finishClaim(io, payload.roomCode, room);
       return;
     }
 
-    // Ask human opponents
+    // Human opponents can judge the claim themselves — always ask them rather
+    // than silently rejecting on the server's (conservative) validation.
     game.pendingClaim = {
       fromSeat: seat,
       approvals: { north: null, east: null, south: null, west: null },
     };
-    // Bots auto-accept (claim was already validated as correct)
+    // Bots auto-accept (they trust the human opponents' judgment)
     for (const s of oppSeats) {
       if (game.seats[s].isAI) game.pendingClaim.approvals[s] = true;
     }

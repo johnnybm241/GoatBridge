@@ -182,6 +182,9 @@ export function useSocketEvents() {
       store().setClaimFromSeat(null);
       if (payload.accepted && payload.gameState) {
         store().setGameState(payload.gameState);
+      } else if (!payload.accepted) {
+        store().setInvalidCardMessage("Claim rejected — you don't have all remaining tricks");
+        setTimeout(() => store().setInvalidCardMessage(null), 3000);
       }
     });
 

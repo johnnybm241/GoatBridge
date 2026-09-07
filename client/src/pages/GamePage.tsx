@@ -121,7 +121,7 @@ export default function GamePage() {
   return (
     <div className="flex h-full min-h-0 gap-0 p-0 sm:gap-2 sm:p-2 md:gap-3 md:p-3 bg-navy">
       {/* Main table */}
-      <div className="flex-1 flex flex-col gap-2 md:gap-3 min-w-0">
+      <div className="flex-1 flex flex-col gap-2 md:gap-3 min-w-0 max-w-[1600px] w-full mx-auto">
         {/* Room code header */}
         <div className="flex items-center justify-between text-xs sm:text-sm px-2 sm:px-0 py-1 sm:py-0">
           <div className="text-cream/50">
