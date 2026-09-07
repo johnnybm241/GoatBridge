@@ -14,7 +14,7 @@ import {
   removeBot,
   isFull,
 } from '../rooms/roomManager.js';
-import { emitToRoom, emitToUser, registerSocket, unregisterSocket, getSocketId } from './broadcaster.js';
+import { emitToRoom, emitToUser, registerSocket, unregisterSocket, getSocketId, emitGameStarted } from './broadcaster.js';
 import { startNewHand } from '../game/stateMachine.js';
 import { scheduleAIActionIfNeeded } from '../ai/aiPlayer.js';
 import type { GameRoom } from '../game/stateMachine.js';
@@ -40,7 +40,12 @@ export function setupRoomHandlers(
   socketUsers.set(socket.id, userId);
 
   // Create room
-  socket.on('create_room', (callback?: (result: { roomCode: string } | { error: string }) => void) => {
+  socket.on('create_room', (maybeCallback?: unknown) => {
+    // Clients may emit with or without an ack callback; anything else is ignored
+    // so a malformed payload can't crash the server.
+    const callback = typeof maybeCallback === 'function'
+      ? maybeCallback as (result: { roomCode: string } | { error: string }) => void
+      : undefined;
     const room = createRoom(userId);
     const result = joinSeat(room, userId, username, skin);
     if ('error' in result) {
@@ -92,7 +97,8 @@ export function setupRoomHandlers(
       });
 
       if (room.game) {
-        socket.emit('game_started', { gameState: room.game, yourHand: [] });
+        // Kibitzers see every hand, so send the current (already-played-down) hands.
+        socket.emit('game_started', { gameState: room.game, yourHand: [], allHands: room.hands });
         if (room.game.dummyHand && room.game.dummy) {
           socket.emit('dummy_revealed', { dummy: room.game.dummy, dummyHand: room.game.dummyHand });
         }
@@ -226,21 +232,8 @@ export function setupRoomHandlers(
     const { game, hands } = startNewHand(room);
     logger.info('Game started', { roomCode: payload.roomCode, dealer: game.dealer, handNumber: game.handNumber });
 
-    // Send each player their hand privately
-    for (const seat of SEATS) {
-      const seatInfo = game.seats[seat];
-      if (!seatInfo.isAI && seatInfo.userId) {
-        const playerSocketId = getSocketId(seatInfo.userId);
-        if (playerSocketId) {
-          io.to(playerSocketId).emit('game_started', {
-            gameState: game,
-            yourHand: hands[seat],
-          });
-        }
-      }
-    }
-
-    // Send spectators game state without hands
+    // Each player gets only their own hand; spectators get all four.
+    emitGameStarted(io, room, game, hands);
     emitToRoom(io, payload.roomCode, 'deal_complete', { dealer: game.dealer });
 
     // Schedule AI if first turn is AI

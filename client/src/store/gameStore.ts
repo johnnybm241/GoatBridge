@@ -7,6 +7,8 @@ interface GameStoreState {
   hostUserId: string | null;
   yourSeat: Seat | null;
   yourHand: Card[];
+  /** All four hands — populated only when kibitzing (spectators see everything). */
+  allHands: Record<Seat, Card[]> | null;
   gameState: GameState | null;
   // Pre-game lobby state (populated from room_joined / room_updated)
   roomSeats: Record<Seat, SeatInfo> | null;
@@ -23,6 +25,7 @@ interface GameStoreState {
   setRoom: (roomCode: string, hostUserId: string, isSpectator: boolean) => void;
   setYourSeat: (seat: Seat) => void;
   setYourHand: (hand: Card[]) => void;
+  setAllHands: (hands: Record<Seat, Card[]> | null) => void;
   setGameState: (state: GameState) => void;
   setRoomLobby: (seats: Record<Seat, SeatInfo>, kibitzingAllowed: boolean, spectators: SpectatorInfo[]) => void;
   setLastHandResult: (result: { contract: Contract; declarer: Seat; tricksMade: number; contractMade: boolean } | null) => void;
@@ -30,6 +33,8 @@ interface GameStoreState {
   revealDummy: (dummy: Seat, dummyHand: Card[]) => void;
   addMessage: (msg: ChatMessage) => void;
   removeCardFromHand: (card: Card) => void;
+  /** Strip a played card from the spectator's all-hands view. */
+  removeCardFromAllHands: (card: Card) => void;
   showGoatToast: (amount: number) => void;
   clearGoatToast: () => void;
   showBleatsToast: (amount: number, reason: string) => void;
@@ -53,6 +58,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   hostUserId: null,
   yourSeat: null,
   yourHand: [],
+  allHands: null,
   gameState: null,
   roomSeats: null,
   roomKibitzingAllowed: true,
@@ -68,6 +74,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   setRoom: (roomCode, hostUserId, isSpectator) => set({ roomCode, hostUserId, isSpectator }),
   setYourSeat: (seat) => set({ yourSeat: seat }),
   setYourHand: (hand) => set({ yourHand: hand }),
+  setAllHands: (hands) => set({ allHands: hands }),
   setGameState: (state) => set({ gameState: state, roomSeats: state.seats, roomKibitzingAllowed: state.kibitzingAllowed, roomSpectators: state.spectators }),
   setRoomLobby: (seats, kibitzingAllowed, spectators) => set({ roomSeats: seats, roomKibitzingAllowed: kibitzingAllowed, roomSpectators: spectators }),
   setLastHandResult: (result) => set({ lastHandResult: result }),
@@ -82,6 +89,15 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     set(s => ({
       yourHand: s.yourHand.filter(c => !(c.suit === card.suit && c.rank === card.rank)),
     })),
+  removeCardFromAllHands: (card) =>
+    set(s => {
+      if (!s.allHands) return {};
+      const next = {} as Record<Seat, Card[]>;
+      for (const seat of Object.keys(s.allHands) as Seat[]) {
+        next[seat] = s.allHands[seat].filter(c => !(c.suit === card.suit && c.rank === card.rank));
+      }
+      return { allHands: next };
+    }),
   showGoatToast: (amount) => set({ goatToast: { amount, id: Date.now() } }),
   clearGoatToast: () => set({ goatToast: null }),
   showBleatsToast: (amount, reason) => set({ bleatsToast: { amount, reason, id: Date.now() } }),
@@ -95,6 +111,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     hostUserId: null,
     yourSeat: null,
     yourHand: [],
+    allHands: null,
     gameState: null,
     roomSeats: null,
     roomKibitzingAllowed: true,

@@ -52,6 +52,7 @@ export function useSocketEvents() {
     socket.on('game_started', (payload) => {
       store().setGameState(payload.gameState);
       store().setYourHand(payload.yourHand);
+      store().setAllHands(payload.allHands ?? null);
       store().setLastHandResult(null);
     });
 
@@ -88,6 +89,7 @@ export function useSocketEvents() {
         ? gs.dummyHand.filter(c => !(c.suit === payload.card.suit && c.rank === payload.card.rank))
         : gs.dummyHand;
       store().setGameState({ ...gs, currentTrick: payload.currentTrick, currentTurn: payload.currentTurn, dummyHand: newDummyHand });
+      store().removeCardFromAllHands(payload.card);
       const seat = store().yourSeat;
       if (payload.seat === seat || (gs.declarer === seat && payload.seat === gs.dummy)) {
         store().removeCardFromHand(payload.card);

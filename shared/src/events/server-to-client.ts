@@ -25,6 +25,8 @@ export interface RoomUpdatedPayload {
 export interface GameStartedPayload {
   gameState: GameState;
   yourHand: Card[]; // only your cards (empty for spectators)
+  /** All four hands — only sent to spectators, who are allowed to see everything. */
+  allHands?: Record<Seat, Card[]>;
 }
 
 export interface DealCompletePayload {

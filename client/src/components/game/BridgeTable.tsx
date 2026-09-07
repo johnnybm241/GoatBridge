@@ -137,6 +137,8 @@ export default function BridgeTable({
   const undoFromSeat = useGameStore(s => s.undoFromSeat);
   const invalidCardMessage = useGameStore(s => s.invalidCardMessage);
   const activeCardBackSkin = useAuthStore(s => s.activeCardBackSkin);
+  const allHands = useGameStore(s => s.allHands);
+  const isSpectator = useGameStore(s => s.isSpectator);
 
   const { phase, bidding, currentTurn, contract, declarer, dummy, dummyHand, seats, trickCounts, scores, vulnerability, completedTricks } = gameState;
   const { bottom, left, top, right } = getSeatsFromPerspective(yourSeat);
@@ -156,6 +158,8 @@ export default function BridgeTable({
   const ewTricks = trickCounts.ew;
 
   const getHandForSeat = (seat: Seat): CardType[] => {
+    // Kibitzers are allowed to see every hand.
+    if (allHands && allHands[seat]) return allHands[seat];
     if (seat === yourSeat) return yourHand;
     if (seat === dummy && dummyHand) return dummyHand;
     return [];
@@ -175,13 +179,30 @@ export default function BridgeTable({
     );
   };
 
-  const renderHandContent = (seat: Seat) => {
+  const renderHandContent = (seat: Seat, position: 'top' | 'bottom' | 'left' | 'right' = 'bottom') => {
     const isDummySeat = dummy === seat && phase === 'playing' && dummyHand;
     const handCards = getHandForSeat(seat);
     // Declarer plays both hands — show dummy as a regular fanned Hand so it
     // takes the same shape/space as declarer's own hand. Defenders see the
     // BBO-style row-per-suit DummyHand layout for readability.
     const viewerIsDeclarer = yourSeat === declarer;
+
+    // Kibitzers see all four hands. The side seats use the compact
+    // row-per-suit layout so 13 cards fit beside the trick area.
+    if (isSpectator && handCards.length > 0) {
+      if (position === 'left' || position === 'right') {
+        return (
+          <DummyHand
+            cards={handCards}
+            dummySeat={seat}
+            position={position}
+            canPlay={false}
+            trumpSuit={contract && contract.strain !== 'notrump' ? contract.strain as CardType['suit'] : null}
+          />
+        );
+      }
+      return <Hand cards={handCards} isYourTurn={false} size="xl" />;
+    }
 
     if (isDummySeat && !viewerIsDeclarer) {
       return (
@@ -232,7 +253,7 @@ export default function BridgeTable({
       <div className="flex justify-center items-start pt-2 sm:pt-3 shrink-0 z-10">
         <div className="flex flex-col items-center gap-0.5">
           {renderNameplate(top)}
-          {renderHandContent(top)}
+          {renderHandContent(top, 'top')}
         </div>
       </div>
 
@@ -241,7 +262,7 @@ export default function BridgeTable({
         {/* Left seat */}
         <div className="shrink-0 flex flex-col items-center gap-0.5">
           {renderNameplate(left)}
-          {renderHandContent(left)}
+          {renderHandContent(left, 'left')}
         </div>
 
         {/* Center: auction history or trick area */}
@@ -258,7 +279,7 @@ export default function BridgeTable({
         {/* Right seat */}
         <div className="shrink-0 flex flex-col items-center gap-0.5">
           {renderNameplate(right)}
-          {renderHandContent(right)}
+          {renderHandContent(right, 'right')}
         </div>
       </div>
 
@@ -317,7 +338,7 @@ export default function BridgeTable({
         </div>
 
         {/* Right: bidding box (during bidding) or claim button (during play) */}
-        {phase === 'bidding' && (
+        {phase === 'bidding' && !isSpectator && (
           <div className="max-h-[42vh] sm:max-h-none overflow-y-auto shrink-0">
             <BiddingBox
               biddingState={bidding}

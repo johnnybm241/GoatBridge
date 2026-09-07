@@ -15,7 +15,7 @@ import type { GameRoom } from '../game/stateMachine.js';
 import { getRoom } from '../rooms/roomManager.js';
 import { createRoom, joinSeat, addBot } from '../rooms/roomManager.js';
 import { getTeamMatchByRoom, createTeamMatch, preGenerateBoards, registerMatchRooms } from '../teamMatches/teamMatchManager.js';
-import { getSocketId } from './broadcaster.js';
+import { getSocketId, emitGameStarted } from './broadcaster.js';
 import { startNewHand } from '../game/stateMachine.js';
 import { scheduleAIActionIfNeeded } from '../ai/aiPlayer.js';
 import type { Tournament } from '../tournaments/tournamentManager.js';
@@ -127,14 +127,7 @@ export function createSocketServer(httpServer: HttpServer): Server {
     const preDealt = preDealtBoards[boardIndex];
     if (!preDealt) return;
     const { game, hands } = startNewHand(room, preDealt);
-    for (const seat of SEATS) {
-      const info = game.seats[seat];
-      if (!info.isAI && info.userId) {
-        const socketId = getSocketId(info.userId);
-        if (socketId) io.to(socketId).emit('game_started', { gameState: game, yourHand: hands[seat] });
-      }
-    }
-    io.to(roomCode).emit('game_started', { gameState: game, yourHand: [] }); // for spectators
+    emitGameStarted(io, room, game, hands);
     scheduleAIActionIfNeeded(room,
       (s, call) => handleAIBid(io, roomCode, s, call),
       (s, card) => handleAIPlay(io, roomCode, s, card),
@@ -176,15 +169,7 @@ export function createSocketServer(httpServer: HttpServer): Server {
       const preDealt = match.preDealtBoards[boardIndex];
       if (!preDealt) return;
       const { game, hands } = startNewHand(room, preDealt);
-      for (const seat of SEATS) {
-        const info = game.seats[seat];
-        if (!info.isAI && info.userId) {
-          const socketId = getSocketId(info.userId);
-          if (socketId) io.to(socketId).emit('game_started', { gameState: game, yourHand: hands[seat] });
-        }
-      }
-      // Spectators get the game state without hands
-      io.to(roomCode).emit('game_started', { gameState: game, yourHand: [] });
+      emitGameStarted(io, room, game, hands);
       scheduleAIActionIfNeeded(room,
         (s, call) => handleAIBid(io, roomCode, s, call),
         (s, card) => handleAIPlay(io, roomCode, s, card),

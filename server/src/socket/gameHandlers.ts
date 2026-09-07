@@ -4,7 +4,7 @@ import { SEATS } from '@goatbridge/shared';
 import type { BidCall } from '@goatbridge/shared';
 import type { Card } from '@goatbridge/shared';
 import { getRoom, findSeatByUserId } from '../rooms/roomManager.js';
-import { emitToRoom, getSocketId } from './broadcaster.js';
+import { emitToRoom, getSocketId, emitGameStarted } from './broadcaster.js';
 import { processBid, processCardPlay, startNewHand, validateClaimAllTricks, settleClaim } from '../game/stateMachine.js';
 import type { GameRoom } from '../game/stateMachine.js';
 import { scheduleAIActionIfNeeded } from '../ai/aiPlayer.js';
@@ -352,15 +352,7 @@ function checkUndoComplete(io: Server, roomCode: string, room: ReturnType<typeof
     room.hands = snapshot.hands;
     emitToRoom(io, roomCode, 'undo_result', { approved: true, gameState: room.game });
     // Re-send hands
-    for (const seat of SEATS) {
-      const seatInfo = room.game.seats[seat];
-      if (!seatInfo.isAI && seatInfo.userId) {
-        const socketId = getSocketId(seatInfo.userId);
-        if (socketId) {
-          io.to(socketId).emit('game_started', { gameState: room.game, yourHand: room.hands[seat] });
-        }
-      }
-    }
+    emitGameStarted(io, room, room.game, room.hands);
   } else {
     emitToRoom(io, roomCode, 'undo_result', { approved: false });
   }
@@ -489,13 +481,7 @@ function dealNextHand(io: Server, roomCode: string): void {
     const room = getRoom(roomCode);
     if (!room) return;
     const { game, hands } = startNewHand(room);
-    for (const s of SEATS) {
-      const seatInfo = game.seats[s];
-      if (!seatInfo.isAI && seatInfo.userId) {
-        const socketId = getSocketId(seatInfo.userId);
-        if (socketId) io.to(socketId).emit('game_started', { gameState: game, yourHand: hands[s] });
-      }
-    }
+    emitGameStarted(io, room, game, hands);
     scheduleAIActionIfNeeded(
       room,
       (seat, call) => handleAIBid(io, roomCode, seat, call),
@@ -565,14 +551,7 @@ function handleTeamMatchBoardResult(
       const preDealt = match.preDealtBoards[nextBoardIndex];
       if (!preDealt) return;
       const { game, hands } = startNewHand(currentRoom, preDealt);
-      for (const seat of SEATS) {
-        const info = game.seats[seat];
-        if (!info.isAI && info.userId) {
-          const socketId = getSocketId(info.userId);
-          if (socketId) io.to(socketId).emit('game_started', { gameState: game, yourHand: hands[seat] });
-        }
-      }
-      io.to(room.roomCode).emit('game_started', { gameState: game, yourHand: [] }); // for spectators
+      emitGameStarted(io, currentRoom, game, hands);
       scheduleAIActionIfNeeded(currentRoom,
         (s, call) => handleAIBid(io, room.roomCode, s, call),
         (s, card) => handleAIPlay(io, room.roomCode, s, card),
@@ -701,14 +680,7 @@ function handlePairsBoardResult(
       const preDealt = preDealtBoards[nextBoardIndex];
       if (!preDealt) return;
       const { game, hands } = startNewHand(currentRoom, preDealt);
-      for (const seat of SEATS) {
-        const info = game.seats[seat];
-        if (!info.isAI && info.userId) {
-          const socketId = getSocketId(info.userId);
-          if (socketId) io.to(socketId).emit('game_started', { gameState: game, yourHand: hands[seat] });
-        }
-      }
-      io.to(room.roomCode).emit('game_started', { gameState: game, yourHand: [] });
+      emitGameStarted(io, currentRoom, game, hands);
       scheduleAIActionIfNeeded(currentRoom,
         (s, call) => handleAIBid(io, room.roomCode, s, call),
         (s, card) => handleAIPlay(io, room.roomCode, s, card),

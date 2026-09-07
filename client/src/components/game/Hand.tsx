@@ -6,7 +6,7 @@ interface HandProps {
   onPlay?: (card: CardType) => void;
   isYourTurn?: boolean;
   horizontal?: boolean;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
   label?: string;
 }
 
@@ -24,6 +24,8 @@ export default function Hand({ cards, onPlay, isYourTurn = false, size = 'md', l
     ? '-ml-5 md:-ml-6 lg:-ml-8'
     : size === 'md'
     ? '-ml-7 md:-ml-9 lg:-ml-12'
+    : size === 'xl'
+    ? '-ml-8 sm:-ml-9 md:-ml-12 lg:-ml-14 xl:-ml-16'
     : '-ml-7 sm:-ml-8 md:-ml-10 lg:-ml-12 xl:-ml-14';
 
   return (
