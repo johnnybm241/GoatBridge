@@ -25,10 +25,13 @@ export default function FriendsPage() {
       api.get<{ friends: FriendSummary[] }>('/friends'),
       api.get<{ incoming: FriendRequestSummary[]; outgoing: FriendRequestSummary[] }>('/friends/requests'),
     ]).then(([f, r]) => {
-      setFriends(f.data.friends);
-      setIncoming(r.data.incoming);
-      setOutgoing(r.data.outgoing);
-      setPendingRequestCount(r.data.incoming.length);
+      setFriends(f.data.friends ?? []);
+      setIncoming(r.data.incoming ?? []);
+      setOutgoing(r.data.outgoing ?? []);
+      setPendingRequestCount(r.data.incoming?.length ?? 0);
+      setError('');
+    }).catch(err => {
+      setError(err.response?.data?.error ?? 'Could not reach the server. Is it running?');
     }).finally(() => setLoading(false));
   }, [setPendingRequestCount]);
 
@@ -83,6 +86,12 @@ export default function FriendsPage() {
   return (
     <div className="max-w-3xl mx-auto p-6">
       <h1 className="text-2xl font-bold text-gold mb-6">Friends</h1>
+
+      {error && (
+        <div className="bg-red-900/40 border border-red-500/40 text-red-200 rounded-lg px-4 py-2 mb-4 text-sm">
+          {error}
+        </div>
+      )}
 
       {/* Search / add */}
       <div className="bg-navy border border-gold/30 rounded-xl p-6 mb-6">
