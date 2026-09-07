@@ -318,17 +318,19 @@ function openingBid(eval_: HandEvaluation): BidCall {
   }
 
   if (hcp < 12) {
+    // Extreme length (7+ cards) always preempts at the 3-level, even within the
+    // weak-two HCP range — a 7-card suit is a stronger preempt than a 6-carder
+    // and 2-level weak twos specifically promise a 6-card suit.
+    if (hcp >= 5 && hcp <= 10) {
+      for (const s of SUITS) {
+        if (shape[s] >= 7) return { type: 'bid', level: 3, strain: s };
+      }
+    }
     // Weak twos: 6-10 HCP, good 6-card major or diamonds
     if (hcp >= 6 && hcp <= 10) {
       if (shape.spades >= 6) return { type: 'bid', level: 2, strain: 'spades' };
       if (shape.hearts >= 6) return { type: 'bid', level: 2, strain: 'hearts' };
       if (shape.diamonds >= 6) return { type: 'bid', level: 2, strain: 'diamonds' };
-    }
-    // Preempts: 7-card suit, weak
-    if (hcp >= 5 && hcp <= 10) {
-      for (const s of SUITS) {
-        if (shape[s] >= 7) return { type: 'bid', level: 3, strain: s };
-      }
     }
     return { type: 'pass' };
   }
@@ -1048,7 +1050,12 @@ function competitiveRebid(
 
   if (myLastBid?.call.type === 'bid' && myLastBid.call.strain !== 'notrump') {
     const suit = myLastBid.call.strain as Suit;
-    if (shape[suit] >= 6 && hcp >= 8) {
+    // A 7+ card suit is a resource on its own — an opener who already showed
+    // that length (e.g. via a weak two or preempt) should retreat to it over
+    // partner's competitive new suit rather than pass, even without extra
+    // HCP, as long as partner hasn't shown real support for it (checked above).
+    const extremeLength = shape[suit] >= 7;
+    if (shape[suit] >= 6 && (extremeLength || hcp >= 8)) {
       const rebidLevel = minLegalLevelForStrain(suit, bidding.currentBid);
       if (rebidLevel <= 7) {
         return { type: 'bid', level: rebidLevel as 1 | 2 | 3 | 4 | 5 | 6 | 7, strain: suit };

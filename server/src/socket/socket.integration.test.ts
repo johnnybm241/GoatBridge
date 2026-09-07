@@ -208,6 +208,10 @@ describe('socket integration', () => {
       });
 
       socket.on('auction_complete', (payload: AuctionCompletePayload) => {
+        // A passed-out auction (no contract) triggers an automatic redeal —
+        // the server stays in/returns to the bidding phase for the next hand
+        // rather than moving to play, so don't flip our local phase here.
+        if (payload.passedOut) return;
         phase = 'playing';
         declarer = payload.declarer;
         dummy = payload.dummy;
