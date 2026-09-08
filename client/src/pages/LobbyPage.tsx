@@ -1,11 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getSocket, initSocket } from '../socket.js';
 import { useAuthStore } from '../store/authStore.js';
 import { useGameStore } from '../store/gameStore.js';
+import { useInvitesStore } from '../store/invitesStore.js';
 import { APP_VERSION } from '../version.js';
 import api from '../api.js';
-import type { Seat, SeatInfo, SpectatorInfo } from '@goatbridge/shared';
+import type { Seat, SeatInfo, SpectatorInfo, TableSummary, TableVisibility, RoomJoinedPayload } from '@goatbridge/shared';
 import { SEATS } from '@goatbridge/shared';
 
 interface ActiveRoom {
@@ -16,22 +17,16 @@ interface ActiveRoom {
 }
 
 export default function LobbyPage() {
-  const [roomCode, setRoomCode] = useState('');
-  const [spectate, setSpectate] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [activeRooms, setActiveRooms] = useState<ActiveRoom[]>([]);
+  const [tables, setTables] = useState<TableSummary[]>([]);
+  const [newTableVisibility, setNewTableVisibility] = useState<TableVisibility>('public');
   const navigate = useNavigate();
   const auth = useAuthStore();
   const gameStore = useGameStore();
-  const roomJoinedHandlerRef = useRef<((payload: {
-    roomCode: string;
-    hostUserId: string;
-    isSpectator: boolean;
-    seats: Record<Seat, SeatInfo>;
-    kibitzingAllowed: boolean;
-    spectators: SpectatorInfo[];
-  }) => void) | null>(null);
+  const invites = useInvitesStore();
+  const roomJoinedHandlerRef = useRef<((payload: RoomJoinedPayload) => void) | null>(null);
   const roomErrorHandlerRef = useRef<((payload: { message: string }) => void) | null>(null);
   const roomRequestTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -54,6 +49,19 @@ export default function LobbyPage() {
       .catch(() => {});
   }, []);
 
+  const loadTables = useCallback(() => {
+    api.get<{ tables: TableSummary[] }>('/rooms/browse')
+      .then(r => setTables(r.data.tables ?? []))
+      .catch(() => setTables([]));
+  }, []);
+
+  // Poll the table list so newly opened tables show up without a manual refresh
+  useEffect(() => {
+    loadTables();
+    const id = setInterval(loadTables, 5000);
+    return () => clearInterval(id);
+  }, [loadTables]);
+
   const clearRoomRequestHandlers = (socket: ReturnType<typeof getSocket>) => {
     if (roomJoinedHandlerRef.current) {
       socket.off('room_joined', roomJoinedHandlerRef.current);
@@ -71,17 +79,11 @@ export default function LobbyPage() {
 
   const setupRoomRequestHandlers = (socket: ReturnType<typeof getSocket>) => {
     clearRoomRequestHandlers(socket);
-    const onJoined = (payload: {
-      roomCode: string;
-      hostUserId: string;
-      isSpectator: boolean;
-      seats: Record<Seat, SeatInfo>;
-      kibitzingAllowed: boolean;
-      spectators: SpectatorInfo[];
-    }) => {
+    const onJoined = (payload: RoomJoinedPayload) => {
       clearRoomRequestHandlers(socket);
       setSubmitting(false);
       gameStore.setRoom(payload.roomCode, payload.hostUserId, payload.isSpectator);
+      gameStore.setRoomVisibility(payload.visibility ?? 'public');
       gameStore.setRoomLobby(payload.seats, payload.kibitzingAllowed, payload.spectators);
       for (const s of SEATS) {
         if (payload.seats[s]?.userId === auth.userId) { gameStore.setYourSeat(s); break; }
@@ -132,27 +134,30 @@ export default function LobbyPage() {
     setSubmitting(true);
     const socket = ensureSocket();
     setupRoomRequestHandlers(socket);
-    socket.emit('create_room');
+    socket.emit('create_room', { visibility: newTableVisibility });
   };
 
-  const joinRoom = () => {
-    if (!roomCode.trim()) { setError('Enter a room code'); return; }
+  const joinTable = (code: string, spectate: boolean) => {
     if (submitting) return;
     setError('');
     setSubmitting(true);
     const socket = ensureSocket();
     setupRoomRequestHandlers(socket);
-    socket.emit('join_room', { roomCode: roomCode.trim().toUpperCase(), spectate });
+    socket.emit('join_room', { roomCode: code.toUpperCase(), spectate });
   };
 
-  const rejoinRoom = (code: string) => {
-    if (submitting) return;
-    setError('');
-    setSubmitting(true);
+  const askToJoin = (code: string) => {
     const socket = ensureSocket();
-    setupRoomRequestHandlers(socket);
-    socket.emit('join_room', { roomCode: code.toUpperCase(), spectate: false });
+    socket.emit('request_join_table', { roomCode: code });
+    setError(`Asked the host to join ${code}. You'll be able to join once they approve.`);
   };
+
+  const acceptInvite = (code: string) => {
+    invites.dismissInvite(code);
+    joinTable(code, false);
+  };
+
+  const rejoinRoom = (code: string) => joinTable(code, false);
 
   const phaseLabel = (phase: string, handNumber: number) => {
     if (phase === 'waiting') return 'Waiting';
@@ -169,6 +174,40 @@ export default function LobbyPage() {
           <h1 className="text-4xl font-bold text-gold mb-2">🐐 GoatBridge</h1>
           <p className="text-cream/60">Contract Bridge — real-time multiplayer</p>
         </div>
+
+        {/* Pending invites */}
+        {invites.invites.length > 0 && (
+          <div className="bg-navy border border-gold rounded-xl p-6 shadow-2xl">
+            <h2 className="text-gold font-bold text-lg mb-3">Table Invites</h2>
+            <div className="space-y-2">
+              {invites.invites.map(inv => (
+                <div
+                  key={inv.roomCode}
+                  className="flex items-center justify-between gap-2 bg-navy/60 border border-gold/20 rounded-lg px-4 py-3"
+                >
+                  <span className="text-cream text-sm min-w-0 truncate">
+                    <span className="font-bold">{inv.fromUsername}</span> invited you
+                  </span>
+                  <div className="flex gap-1.5 shrink-0">
+                    <button
+                      onClick={() => acceptInvite(inv.roomCode)}
+                      disabled={submitting}
+                      className="bg-gold hover:bg-gold/80 text-navy font-bold px-3 py-1.5 rounded-lg text-sm transition-colors"
+                    >
+                      Join
+                    </button>
+                    <button
+                      onClick={() => invites.dismissInvite(inv.roomCode)}
+                      className="border border-cream/30 hover:border-cream/70 text-cream/70 px-3 py-1.5 rounded-lg text-sm transition-colors"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Active rooms */}
         {activeRooms.length > 0 && (
@@ -204,50 +243,115 @@ export default function LobbyPage() {
         {/* Create Room */}
         <div className="bg-navy border border-gold/30 rounded-xl p-6 shadow-2xl">
           <h2 className="text-gold font-bold text-lg mb-4">Create a Table</h2>
-          <p className="text-cream/60 text-sm mb-4">
-            Start a new room. You'll be the host and can add AI bots to fill empty seats.
+          <p className="text-cream/60 text-sm mb-3">
+            You'll be the host — invite players, remove them, and change table settings.
+          </p>
+          <div className="flex gap-2 mb-4">
+            {(['public', 'invite_only'] as TableVisibility[]).map(v => (
+              <button
+                key={v}
+                onClick={() => setNewTableVisibility(v)}
+                className={`flex-1 rounded-lg px-3 py-2 text-sm font-bold border transition-colors ${
+                  newTableVisibility === v
+                    ? 'bg-gold text-navy border-gold'
+                    : 'bg-navy text-cream/70 border-gold/30 hover:border-gold/60'
+                }`}
+              >
+                {v === 'public' ? '🌍 Public' : '🔒 Invite only'}
+              </button>
+            ))}
+          </div>
+          <p className="text-cream/40 text-xs mb-4">
+            {newTableVisibility === 'public'
+              ? 'Anyone can see this table in the lobby and take a free seat.'
+              : 'Only players you invite can sit down. Others can ask to join.'}
           </p>
           <button
             onClick={createRoom}
             disabled={submitting}
             className="w-full bg-gold hover:bg-gold-light text-navy font-bold py-3 rounded-lg transition-colors text-lg"
           >
-            {submitting ? 'Opening…' : 'Create Room'}
+            {submitting ? 'Opening…' : 'Create Table'}
           </button>
         </div>
 
-        {/* Join Room */}
+        {/* Table browser */}
         <div className="bg-navy border border-gold/30 rounded-xl p-6 shadow-2xl">
-          <h2 className="text-gold font-bold text-lg mb-4">Join a Table</h2>
-          <div className="space-y-3">
-            <input
-              type="text"
-              value={roomCode}
-              onChange={e => setRoomCode(e.target.value.toUpperCase())}
-              onKeyDown={e => e.key === 'Enter' && joinRoom()}
-              placeholder="Room Code (e.g. ABC123)"
-              maxLength={6}
-              className="w-full bg-navy border border-gold/30 text-cream rounded-lg px-3 py-2 focus:outline-none focus:border-gold transition-colors uppercase tracking-widest font-mono"
-            />
-            <label className="flex items-center gap-2 text-cream/70 text-sm cursor-pointer">
-              <input
-                type="checkbox"
-                checked={spectate}
-                onChange={e => setSpectate(e.target.checked)}
-                disabled={submitting}
-                className="accent-gold"
-              />
-              Join as spectator (kibitz)
-            </label>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-gold font-bold text-lg">Open Tables</h2>
             <button
-              onClick={joinRoom}
-              disabled={submitting}
-              className="w-full bg-felt hover:bg-felt-light text-cream font-bold py-3 rounded-lg transition-colors border border-felt-light"
+              onClick={loadTables}
+              className="text-cream/50 hover:text-cream text-xs border border-cream/20 hover:border-cream/50 rounded px-2 py-1 transition-colors"
             >
-              {submitting ? 'Opening…' : 'Join Room'}
+              Refresh
             </button>
           </div>
-          {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
+
+          {tables.length === 0 ? (
+            <p className="text-cream/40 text-sm text-center py-4">
+              No open tables right now. Create one above!
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {tables.map(t => {
+                const canSit = t.openSeats > 0 && (t.visibility === 'public' || t.invited);
+                return (
+                  <div
+                    key={t.roomCode}
+                    className="bg-navy/60 border border-gold/20 rounded-lg px-4 py-3"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-cream font-bold truncate">
+                            {t.hostName}'s table
+                          </span>
+                          <span title={t.visibility === 'public' ? 'Public' : 'Invite only'}>
+                            {t.visibility === 'public' ? '🌍' : '🔒'}
+                          </span>
+                        </div>
+                        <div className="text-cream/50 text-xs mt-0.5">
+                          {t.openSeats > 0 ? `${t.openSeats} seat${t.openSeats === 1 ? '' : 's'} open` : 'Full'}
+                          {' · '}
+                          {t.phase === 'waiting' ? 'Waiting' : 'In play'}
+                          {t.spectatorCount > 0 && ` · ${t.spectatorCount} watching`}
+                        </div>
+                      </div>
+                      <div className="flex gap-1.5 shrink-0">
+                        {canSit && (
+                          <button
+                            onClick={() => joinTable(t.roomCode, false)}
+                            disabled={submitting}
+                            className="bg-gold hover:bg-gold/80 text-navy font-bold px-3 py-1.5 rounded-lg text-sm transition-colors"
+                          >
+                            Join
+                          </button>
+                        )}
+                        {!canSit && t.visibility === 'invite_only' && !t.invited && (
+                          <button
+                            onClick={() => askToJoin(t.roomCode)}
+                            className="border border-gold/40 hover:border-gold text-gold font-bold px-3 py-1.5 rounded-lg text-sm transition-colors"
+                          >
+                            Ask to join
+                          </button>
+                        )}
+                        {t.kibitzingAllowed && (
+                          <button
+                            onClick={() => joinTable(t.roomCode, true)}
+                            disabled={submitting}
+                            className="border border-cream/30 hover:border-cream/70 text-cream/80 px-3 py-1.5 rounded-lg text-sm transition-colors"
+                          >
+                            Watch
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
         </div>
 
         <p className="text-center text-cream/30 text-xs">

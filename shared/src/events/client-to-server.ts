@@ -1,6 +1,7 @@
 import type { BidCall } from '../types/bidding.js';
 import type { Card } from '../types/card.js';
 import type { Seat } from '../types/game.js';
+import type { TableVisibility } from '../types/social.js';
 
 export interface JoinRoomPayload {
   roomCode: string;
@@ -148,8 +149,37 @@ export interface LeaveTournamentPairPayload {
   tournamentCode: string;
 }
 
+export interface CreateRoomPayload {
+  visibility?: TableVisibility;
+}
+
+export interface InviteToTablePayload {
+  roomCode: string;
+  userId: string;
+}
+
+export interface RequestJoinTablePayload {
+  roomCode: string;
+}
+
+export interface RespondJoinRequestPayload {
+  roomCode: string;
+  userId: string;
+  approve: boolean;
+}
+
+export interface KickPlayerPayload {
+  roomCode: string;
+  seat: Seat;
+}
+
+export interface SetTableVisibilityPayload {
+  roomCode: string;
+  visibility: TableVisibility;
+}
+
 export interface ClientToServerEvents {
-  create_room: () => void;
+  create_room: (payload?: CreateRoomPayload) => void;
   join_room: (payload: JoinRoomPayload) => void;
   leave_room: (payload: LeaveRoomPayload) => void;
   add_bot: (payload: AddBotPayload) => void;
@@ -162,6 +192,11 @@ export interface ClientToServerEvents {
   chat_message: (payload: ChatMessagePayload) => void;
   set_kibitzing: (payload: SetKibitzingPayload) => void;
   kick_spectator: (payload: KickSpectatorPayload) => void;
+  invite_to_table: (payload: InviteToTablePayload) => void;
+  request_join_table: (payload: RequestJoinTablePayload) => void;
+  respond_join_request: (payload: RespondJoinRequestPayload) => void;
+  kick_player: (payload: KickPlayerPayload) => void;
+  set_table_visibility: (payload: SetTableVisibilityPayload) => void;
   approve_player_return: (payload: ApprovePlayerReturnPayload) => void;
   deny_player_return: (payload: DenyPlayerReturnPayload) => void;
   share_convention_card: (payload: ShareConventionCardPayload) => void;

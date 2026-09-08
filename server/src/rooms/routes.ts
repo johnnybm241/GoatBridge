@@ -2,10 +2,15 @@ import { Router } from 'express';
 import { sqlite } from '../db/index.js';
 import { requireAuth } from '../auth/middleware.js';
 import type { AuthRequest } from '../auth/middleware.js';
-import { rooms } from './roomManager.js';
+import { rooms, listJoinableTables } from './roomManager.js';
 import { SEATS } from '@goatbridge/shared';
 
 const router = Router();
+
+// Tables the user can browse and join from the lobby
+router.get('/browse', requireAuth, (req: AuthRequest, res) => {
+  res.json({ tables: listJoinableTables(req.userId!) });
+});
 
 // Returns in-memory rooms where the authenticated user has a seat
 router.get('/active', requireAuth, (req: AuthRequest, res) => {

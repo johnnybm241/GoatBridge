@@ -9,7 +9,7 @@ import BridgeTable from '../components/game/BridgeTable.js';
 import RoomChat from '../components/chat/RoomChat.js';
 import HostAdminPanel from '../components/admin/HostAdminPanel.js';
 import type { BidCall, Card } from '@goatbridge/shared';
-import type { Seat } from '@goatbridge/shared';
+import type { Seat, TableVisibility } from '@goatbridge/shared';
 import { SEATS } from '@goatbridge/shared';
 
 const SIDEBAR_MIN = 160;
@@ -55,6 +55,7 @@ export default function GamePage() {
     clearBleatsToast,
     roomSeats,
     roomKibitzingAllowed,
+    roomVisibility,
     roomSpectators,
     lastHandResult,
   } = useGameState();
@@ -159,9 +160,8 @@ export default function GamePage() {
             />
           ) : (
             <WaitingRoom
-              roomCode={roomCode!}
               isHost={isHost}
-              hostUserId={hostUserId}
+              visibility={roomVisibility}
             />
           )}
         </div>
@@ -184,6 +184,7 @@ export default function GamePage() {
             seats={roomSeats ?? ({} as Record<Seat, { userId: string | null; isAI: boolean; displayName: string }>)}
             kibitzingAllowed={roomKibitzingAllowed}
             spectators={roomSpectators}
+            visibility={roomVisibility}
           />
         )}
 
@@ -226,17 +227,18 @@ export default function GamePage() {
   );
 }
 
-function WaitingRoom({ roomCode, isHost, hostUserId }: { roomCode: string; isHost: boolean; hostUserId: string | null }) {
+function WaitingRoom({ isHost, visibility }: { isHost: boolean; visibility: TableVisibility }) {
   return (
     <div className="felt-texture rounded-2xl h-full flex flex-col items-center justify-center gap-4 text-cream/70 border-4 border-felt-dark/50">
       <div className="text-6xl">🐐</div>
       <div className="text-2xl font-bold text-gold">Waiting for players…</div>
       <div className="text-sm">
-        Share this room code:{' '}
-        <span className="text-gold font-mono font-bold text-lg tracking-widest">{roomCode}</span>
+        {visibility === 'public'
+          ? 'This table is listed in the lobby — anyone can take a free seat.'
+          : 'This table is invite only. Only invited players can sit down.'}
       </div>
       {isHost && (
-        <p className="text-cream/50 text-sm">Use the Host Controls panel →</p>
+        <p className="text-cream/50 text-sm">Invite friends or add bots from Host Controls →</p>
       )}
     </div>
   );

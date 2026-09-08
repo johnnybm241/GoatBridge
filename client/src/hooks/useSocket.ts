@@ -5,6 +5,7 @@ import { useAuthStore } from '../store/authStore.js';
 import { useTeamMatchStore } from '../store/teamMatchStore.js';
 import { useTournamentStore } from '../store/tournamentStore.js';
 import { useFriendsStore } from '../store/friendsStore.js';
+import { useInvitesStore } from '../store/invitesStore.js';
 import type { Seat, SeatInfo } from '@goatbridge/shared';
 import { SEATS } from '@goatbridge/shared';
 
@@ -30,6 +31,7 @@ export function useSocketEvents() {
     socket.on('room_joined', (payload) => {
       store().setRoom(payload.roomCode, payload.hostUserId, payload.isSpectator);
       store().setRoomLobby(payload.seats, payload.kibitzingAllowed, payload.spectators);
+      store().setRoomVisibility(payload.visibility ?? 'public');
       if (payload.seats) {
         const yourUserId = authStore.userId;
         for (const s of SEATS) {
@@ -241,6 +243,35 @@ export function useSocketEvents() {
       // No persistent UI state needed here beyond a toast; kept minimal for now.
     });
 
+    socket.on('table_invite_received', (payload) => {
+      useInvitesStore.getState().addInvite(payload.invite);
+    });
+
+    socket.on('join_request_received', (payload) => {
+      useInvitesStore.getState().addJoinRequest(payload.request);
+    });
+
+    socket.on('join_request_resolved', (payload) => {
+      // An approved request grants access just like an invite, so surface it the same way.
+      if (payload.approved) {
+        useInvitesStore.getState().addInvite({
+          roomCode: payload.roomCode,
+          fromUserId: '',
+          fromUsername: payload.hostName,
+          visibility: 'invite_only',
+          createdAt: Date.now(),
+        });
+      }
+    });
+
+    socket.on('host_changed', (payload) => {
+      store().setHostUserId(payload.hostUserId);
+    });
+
+    socket.on('table_visibility_changed', (payload) => {
+      store().setRoomVisibility(payload.visibility);
+    });
+
     return () => {
       registered.current = false;
       socket.off('room_joined');
@@ -271,6 +302,11 @@ export function useSocketEvents() {
       socket.off('tournament_complete');
       socket.off('friend_request_received');
       socket.off('friend_request_accepted');
+      socket.off('table_invite_received');
+      socket.off('join_request_received');
+      socket.off('join_request_resolved');
+      socket.off('host_changed');
+      socket.off('table_visibility_changed');
     };
   }, []);
 }

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { GameState, Card, Seat, SeatInfo, SpectatorInfo, Contract } from '@goatbridge/shared';
+import type { GameState, Card, Seat, SeatInfo, SpectatorInfo, Contract, TableVisibility } from '@goatbridge/shared';
 
 interface GameStoreState {
   roomCode: string | null;
@@ -14,6 +14,7 @@ interface GameStoreState {
   roomSeats: Record<Seat, SeatInfo> | null;
   roomKibitzingAllowed: boolean;
   roomSpectators: SpectatorInfo[];
+  roomVisibility: TableVisibility;
   lastHandResult: { contract: Contract; declarer: Seat; tricksMade: number; contractMade: boolean } | null;
   messages: ChatMessage[];
   goatToast: { amount: number; id: number } | null;
@@ -23,6 +24,8 @@ interface GameStoreState {
   invalidCardMessage: string | null; // brief error shown when a card play is rejected
 
   setRoom: (roomCode: string, hostUserId: string, isSpectator: boolean) => void;
+  setHostUserId: (hostUserId: string) => void;
+  setRoomVisibility: (visibility: TableVisibility) => void;
   setYourSeat: (seat: Seat) => void;
   setYourHand: (hand: Card[]) => void;
   setAllHands: (hands: Record<Seat, Card[]> | null) => void;
@@ -63,6 +66,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   roomSeats: null,
   roomKibitzingAllowed: true,
   roomSpectators: [],
+  roomVisibility: 'public',
   lastHandResult: null,
   messages: [],
   goatToast: null,
@@ -72,6 +76,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   invalidCardMessage: null,
 
   setRoom: (roomCode, hostUserId, isSpectator) => set({ roomCode, hostUserId, isSpectator }),
+  setHostUserId: (hostUserId) => set({ hostUserId }),
+  setRoomVisibility: (visibility) => set({ roomVisibility: visibility }),
   setYourSeat: (seat) => set({ yourSeat: seat }),
   setYourHand: (hand) => set({ yourHand: hand }),
   setAllHands: (hands) => set({ allHands: hands }),
@@ -116,6 +122,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     roomSeats: null,
     roomKibitzingAllowed: true,
     roomSpectators: [],
+    roomVisibility: 'public',
     lastHandResult: null,
     messages: [],
     goatToast: null,

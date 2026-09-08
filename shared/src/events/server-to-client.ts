@@ -5,6 +5,7 @@ import type { Contract, HandScore, RubberScore } from '../types/scoring.js';
 import type { ConventionCardData } from '../types/conventions.js';
 import type { TeamMatchState } from '../types/teamMatch.js';
 import type { TournamentState, PairEntry } from '../types/tournament.js';
+import type { TableInvite, TableJoinRequest, TableVisibility } from '../types/social.js';
 
 export interface RoomJoinedPayload {
   roomCode: string;
@@ -13,6 +14,7 @@ export interface RoomJoinedPayload {
   spectators: SpectatorInfo[];
   hostUserId: string;
   isSpectator: boolean;
+  visibility: TableVisibility;
 }
 
 export interface RoomUpdatedPayload {
@@ -236,6 +238,29 @@ export interface FriendRequestAcceptedPayload {
   username: string;
 }
 
+export interface TableInviteReceivedPayload {
+  invite: TableInvite;
+}
+
+export interface JoinRequestReceivedPayload {
+  request: TableJoinRequest;
+}
+
+export interface JoinRequestResolvedPayload {
+  roomCode: string;
+  approved: boolean;
+  hostName: string;
+}
+
+export interface HostChangedPayload {
+  hostUserId: string;
+  hostName: string;
+}
+
+export interface TableVisibilityChangedPayload {
+  visibility: TableVisibility;
+}
+
 export interface ServerToClientEvents {
   room_joined: (payload: RoomJoinedPayload) => void;
   room_updated: (payload: RoomUpdatedPayload) => void;
@@ -273,6 +298,11 @@ export interface ServerToClientEvents {
   bleats_awarded: (payload: BleatsAwardedPayload) => void;
   friend_request_received: (payload: FriendRequestReceivedPayload) => void;
   friend_request_accepted: (payload: FriendRequestAcceptedPayload) => void;
+  table_invite_received: (payload: TableInviteReceivedPayload) => void;
+  join_request_received: (payload: JoinRequestReceivedPayload) => void;
+  join_request_resolved: (payload: JoinRequestResolvedPayload) => void;
+  host_changed: (payload: HostChangedPayload) => void;
+  table_visibility_changed: (payload: TableVisibilityChangedPayload) => void;
   team_match_state: (payload: TeamMatchStatePayload) => void;
   team_match_updated: (payload: TeamMatchStatePayload) => void;
   team_match_started: (payload: TeamMatchStartedPayload) => void;

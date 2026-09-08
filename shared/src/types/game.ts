@@ -28,6 +28,8 @@ export interface SeatInfo {
   disconnectedAt: number | null;
   originalUserId: string | null;
   activeCardBackSkin: string;
+  /** When this player first sat down; used to pick the next host. Null for empty seats/bots. */
+  joinedAt: number | null;
 }
 
 export interface SpectatorInfo {

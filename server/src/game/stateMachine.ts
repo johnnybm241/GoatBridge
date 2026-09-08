@@ -25,6 +25,7 @@ import {
 } from './scoring.js';
 import type { SeatInfo } from '@goatbridge/shared';
 import type { Contract } from '@goatbridge/shared';
+import type { TableVisibility } from '@goatbridge/shared';
 
 export interface GameRoom {
   roomCode: string;
@@ -32,6 +33,10 @@ export interface GameRoom {
   seats: Record<Seat, SeatInfo>;
   kibitzingAllowed: boolean;
   spectators: Array<{ userId: string; displayName: string }>;
+  /** Who may sit down. Invite-only tables also honour `invitedUserIds`. */
+  visibility: TableVisibility;
+  /** Users the host invited or approved into an invite-only table. */
+  invitedUserIds: string[];
   game: GameState | null;
   hands: Record<Seat, Card[]>; // server-only, not broadcast
   undoStack: Array<{ game: GameState; hands: Record<Seat, Card[]> }>; // for undo

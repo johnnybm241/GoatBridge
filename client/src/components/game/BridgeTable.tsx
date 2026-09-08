@@ -139,6 +139,7 @@ export default function BridgeTable({
   const activeCardBackSkin = useAuthStore(s => s.activeCardBackSkin);
   const allHands = useGameStore(s => s.allHands);
   const isSpectator = useGameStore(s => s.isSpectator);
+  const hostUserId = useGameStore(s => s.hostUserId);
 
   const { phase, bidding, currentTurn, contract, declarer, dummy, dummyHand, seats, trickCounts, scores, vulnerability, completedTricks } = gameState;
   const { bottom, left, top, right } = getSeatsFromPerspective(yourSeat);
@@ -174,6 +175,7 @@ export default function BridgeTable({
         isCurrentTurn={currentTurn === seat}
         isDeclarer={declarer === seat}
         isDummy={dummy === seat}
+        isHost={!!hostUserId && seats[seat]?.userId === hostUserId}
         trickCount={trickCount}
       />
     );

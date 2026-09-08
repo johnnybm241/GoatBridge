@@ -7,6 +7,7 @@ interface SeatNameplateProps {
   isCurrentTurn?: boolean;
   isDeclarer?: boolean;
   isDummy?: boolean;
+  isHost?: boolean;
   trickCount?: number;
 }
 
@@ -18,6 +19,7 @@ export default function SeatNameplate({
   isCurrentTurn = false,
   isDeclarer = false,
   isDummy = false,
+  isHost = false,
   trickCount = 0,
 }: SeatNameplateProps) {
   const isEmpty = !info.userId && !info.isAI;
@@ -39,6 +41,7 @@ export default function SeatNameplate({
 
       <div className="flex flex-col leading-tight min-w-0">
         <span className="truncate max-w-[72px] sm:max-w-[100px] 2xl:max-w-[140px] font-medium">
+          {isHost && !isEmpty && <span title="Table host">👑 </span>}
           {isEmpty ? 'Empty' : info.displayName}
         </span>
         <div className="flex items-center gap-1 text-[10px] sm:text-xs 2xl:text-sm text-cream/50">
