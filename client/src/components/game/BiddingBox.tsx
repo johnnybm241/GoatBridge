@@ -7,7 +7,6 @@ import { explainBidAt } from '../../lib/bidExplainer.js';
 interface BiddingBoxProps {
   biddingState: BiddingState;
   onBid: (call: BidCall) => void;
-  disabled?: boolean;
   yourSeat?: Seat | null;
 }
 
@@ -35,16 +34,16 @@ function isLevelAvailable(level: number, state: BiddingState): boolean {
   return STRAINS.some(s => isBidAvailable(level, s, state));
 }
 
-export default function BiddingBox({ biddingState, onBid, disabled = false, yourSeat = null }: BiddingBoxProps) {
+export default function BiddingBox({ biddingState, onBid, yourSeat = null }: BiddingBoxProps) {
   const [selectedLevel, setSelectedLevel] = useState<1 | 2 | 3 | 4 | 5 | 6 | 7 | null>(null);
 
-  // Reset selection when the auction advances (a new bid came in) or box is disabled
+  // Reset selection when the auction advances (a new bid came in)
   useEffect(() => {
     setSelectedLevel(null);
-  }, [biddingState.calls.length, disabled]);
+  }, [biddingState.calls.length]);
 
-  const canDouble = !disabled && biddingState.currentBid !== null && biddingState.doubleStatus === 'none';
-  const canRedouble = !disabled && biddingState.doubleStatus === 'doubled';
+  const canDouble = biddingState.currentBid !== null && biddingState.doubleStatus === 'none';
+  const canRedouble = biddingState.doubleStatus === 'doubled';
 
   const preview = (call: BidCall): string | undefined => {
     if (!yourSeat) return undefined;
@@ -75,7 +74,7 @@ export default function BiddingBox({ biddingState, onBid, disabled = false, your
         {/* Level row */}
         <div className="flex gap-1">
           {LEVELS.map(level => {
-            const avail = !disabled && isLevelAvailable(level, biddingState);
+            const avail = isLevelAvailable(level, biddingState);
             const selected = selectedLevel === level;
             return (
               <button
@@ -99,8 +98,7 @@ export default function BiddingBox({ biddingState, onBid, disabled = false, your
         {/* Strain row (only enabled when a level is selected) */}
         <div className="flex gap-1">
           {STRAINS.map(strain => {
-            const avail =
-              !disabled && selectedLevel !== null && isBidAvailable(selectedLevel, strain, biddingState);
+            const avail = selectedLevel !== null && isBidAvailable(selectedLevel, strain, biddingState);
             const d = STRAIN_DISPLAY[strain];
             return (
               <button
@@ -127,10 +125,9 @@ export default function BiddingBox({ biddingState, onBid, disabled = false, your
         {/* Action row: Pass / Dbl / Rdbl */}
         <div className="flex gap-1 mt-0.5">
           <button
-            onClick={() => !disabled && onBid({ type: 'pass' })}
-            disabled={disabled}
-            title={!disabled ? preview({ type: 'pass' }) : undefined}
-            className="flex-1 h-8 rounded-md text-xs font-bold bg-green-600 hover:bg-green-500 text-white shadow-sm active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-help"
+            onClick={() => onBid({ type: 'pass' })}
+            title={preview({ type: 'pass' })}
+            className="flex-1 h-8 rounded-md text-xs font-bold bg-green-600 hover:bg-green-500 text-white shadow-sm active:scale-95 transition-all cursor-help"
           >
             Pass
           </button>

@@ -265,10 +265,19 @@ export default function BridgeTable({
           {renderHandContent(left, 'left')}
         </div>
 
-        {/* Center: auction history or trick area */}
-        <div className="relative flex-1 flex items-center justify-center min-h-0 overflow-hidden self-stretch">
+        {/* Center: auction (+ bidding box on your turn) or trick area */}
+        <div className="relative flex-1 flex flex-col items-center justify-center gap-2 min-h-0 overflow-hidden self-stretch">
           {phase === 'bidding' ? (
-            <AuctionHistory bidding={bidding} dealer={gameState.dealer} vulnerability={vulnerability} seats={seats} />
+            <>
+              <div className="flex items-center justify-center min-h-0 overflow-y-auto">
+                <AuctionHistory bidding={bidding} dealer={gameState.dealer} vulnerability={vulnerability} seats={seats} />
+              </div>
+              {isYourTurn && !isSpectator && (
+                <div className="shrink-0">
+                  <BiddingBox biddingState={bidding} onBid={onBid} yourSeat={yourSeat} />
+                </div>
+              )}
+            </>
           ) : phase === 'playing' && showAuctionInPlay ? (
             <AuctionHistory bidding={bidding} dealer={gameState.dealer} vulnerability={vulnerability} seats={seats} />
           ) : (
@@ -337,17 +346,7 @@ export default function BridgeTable({
           )}
         </div>
 
-        {/* Right: bidding box (during bidding) or claim button (during play) */}
-        {phase === 'bidding' && !isSpectator && (
-          <div className="max-h-[42vh] sm:max-h-none overflow-y-auto shrink-0">
-            <BiddingBox
-              biddingState={bidding}
-              onBid={onBid}
-              disabled={!isYourTurn}
-              yourSeat={yourSeat}
-            />
-          </div>
-        )}
+        {/* Right: claim button (during play) */}
         {phase === 'playing' && yourSeat && (yourSeat === declarer || yourSeat === dummy) && !claimFromSeat && !undoFromSeat && (
           <button
             onClick={() => getSocket().emit('request_claim', { roomCode })}
