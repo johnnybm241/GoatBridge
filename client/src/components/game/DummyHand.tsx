@@ -54,7 +54,7 @@ export default function DummyHand({ cards, onPlay, canPlay = false, trumpSuit }:
                     key={`${card.suit}-${card.rank}`}
                     className={
                       i > 0
-                        ? '-ml-7 sm:-ml-9 md:-ml-12 lg:-ml-16 xl:-ml-[76px]'
+                        ? '-ml-7 sm:-ml-9 md:-ml-11 lg:-ml-[58px] xl:-ml-[68px]'
                         : ''
                     }
                     style={{ zIndex: i + 1 }}
