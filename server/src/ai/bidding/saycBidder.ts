@@ -332,10 +332,12 @@ function openingBid(eval_: HandEvaluation): BidCall {
       if (shape.hearts >= 6) return { type: 'bid', level: 2, strain: 'hearts' };
       if (shape.diamonds >= 6) return { type: 'bid', level: 2, strain: 'diamonds' };
     }
-    return { type: 'pass' };
+    // Rule of 20: HCP + two longest suits >= 20 opens at the 1-level
+    const [longest = 0, second = 0] = SUITS.map(s => shape[s]).sort((a, b) => b - a);
+    if (hcp + longest + second < 20) return { type: 'pass' };
   }
 
-  // 12+ HCP, non-balanced-NT-range → 1-level opening
+  // 12+ HCP (or Rule of 20), non-balanced-NT-range → 1-level opening
   if (shape.spades >= 5 && shape.spades >= shape.hearts) return { type: 'bid', level: 1, strain: 'spades' };
   if (shape.hearts >= 5) return { type: 'bid', level: 1, strain: 'hearts' };
   if (shape.diamonds >= shape.clubs) return { type: 'bid', level: 1, strain: 'diamonds' };

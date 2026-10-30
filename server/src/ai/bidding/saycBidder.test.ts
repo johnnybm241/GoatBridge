@@ -68,6 +68,19 @@ describe('SAYC bidder — opening bids', () => {
     expect(bid).toEqual({ type: 'bid', level: 2, strain: 'spades' });
   });
 
+  it('Rule of 20: opens 1♠ with 11 HCP and 5-4 shape (11+9=20)', () => {
+    // AKJ54=8, KJ32=4... use 11 HCP: AQ=6? build: spades AQ854(6), hearts KJ32(4), diamonds 5(0), clubs 742(0) → 10
+    const hand = makeHand({ spades: 'AQJ54', hearts: 'KJ32', diamonds: '5', clubs: '742' });
+    const bid = chooseBid(hand, 'south', makeBidding([]));
+    expect(bid).toEqual({ type: 'bid', level: 1, strain: 'spades' });
+  });
+
+  it('Rule of 20: passes when total is 19', () => {
+    const hand = makeHand({ spades: 'AQJ54', hearts: 'K432', diamonds: '5', clubs: '742' });
+    const bid = chooseBid(hand, 'south', makeBidding([]));
+    expect(bid).toEqual({ type: 'pass' });
+  });
+
   it('passes with fewer than 12 HCP', () => {
     const hand = makeHand({ spades: 'K84', hearts: 'Q73', diamonds: 'J652', clubs: '542' });
     const bid = chooseBid(hand, 'south', makeBidding([]));
