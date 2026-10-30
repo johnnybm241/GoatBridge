@@ -141,10 +141,12 @@ export default function GamePage() {
     <div className="flex h-full min-h-0 gap-0 p-0 sm:gap-2 sm:p-2 md:gap-3 md:p-3 bg-navy">
       {/* Main table */}
       <div className="flex-1 flex flex-col gap-2 md:gap-3 min-w-0 max-w-[1600px] w-full mx-auto">
-        {/* Room code header */}
+        {/* Table header */}
         <div className="flex items-center justify-between text-xs sm:text-sm px-2 sm:px-0 py-1 sm:py-0">
           <div className="text-cream/50">
-            Room: <span className="text-gold font-mono font-bold tracking-widest">{roomCode}</span>
+            <span title={roomVisibility === 'public' ? 'Public table' : 'Invite only'}>
+              {roomVisibility === 'public' ? '🌍 Public table' : '🔒 Invite-only table'}
+            </span>
             {isSpectator && <span className="ml-2 text-blue-400">(Spectating)</span>}
           </div>
           <div className="flex items-center gap-3">
@@ -188,6 +190,7 @@ export default function GamePage() {
             <WaitingRoom
               isHost={isHost}
               visibility={roomVisibility}
+              onSit={isSpectator ? (seat) => getSocket().emit('join_room', { roomCode: roomCode!, seat }) : undefined}
             />
           )}
         </div>
@@ -253,7 +256,7 @@ export default function GamePage() {
   );
 }
 
-function WaitingRoom({ isHost, visibility }: { isHost: boolean; visibility: TableVisibility }) {
+function WaitingRoom({ isHost, visibility, onSit }: { isHost: boolean; visibility: TableVisibility; onSit?: (seat: Seat) => void }) {
   const roomSeats = useGameStore(s => s.roomSeats);
   return (
     <div className="felt-texture rounded-2xl h-full flex flex-col items-center justify-center gap-4 text-cream/70 border-4 border-felt-dark/50">
@@ -263,10 +266,15 @@ function WaitingRoom({ isHost, visibility }: { isHost: boolean; visibility: Tabl
         {SEATS.map(seat => {
           const info = roomSeats?.[seat];
           const empty = !info?.userId && !info?.isAI;
+          const canSit = empty && !!onSit;
           return (
-            <div key={seat} className={`px-3 py-1.5 rounded-lg border border-gold/20 bg-navy/60 text-sm min-w-[130px] ${empty ? 'opacity-50' : ''}`}>
+            <div
+              key={seat}
+              onClick={canSit ? () => onSit!(seat) : undefined}
+              className={`px-3 py-1.5 rounded-lg border border-gold/20 bg-navy/60 text-sm min-w-[130px] ${empty ? 'opacity-50' : ''} ${canSit ? 'cursor-pointer opacity-100 hover:border-gold hover:bg-gold/10' : ''}`}
+            >
               <span className="uppercase text-cream/40 text-xs mr-2">{seat[0]}</span>
-              {empty ? (visibility === 'invite_only' ? '🔒 Empty' : 'Empty') : `${info?.isAI ? '🤖 ' : ''}${info?.displayName}`}
+              {empty ? (canSit ? 'Sit here' : visibility === 'invite_only' ? '🔒 Empty' : 'Empty') : `${info?.isAI ? '🤖 ' : ''}${info?.displayName}`}
             </div>
           );
         })}

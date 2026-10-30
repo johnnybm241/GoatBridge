@@ -167,8 +167,7 @@ export default function PlayerProfilePage() {
         {profile.presence ? (
           <div>
             <div className="text-cream mb-2">
-              Table <span className="font-mono font-bold text-gold">{profile.presence.roomCode}</span>
-              {profile.presence.isSpectator ? ' (spectating)' : profile.presence.seat ? ` — seated ${profile.presence.seat}` : ''}
+              {profile.presence.isSpectator ? 'Spectating' : profile.presence.seat ? `Seated ${profile.presence.seat}` : 'At a table'}
               <span className="text-cream/50"> · {profile.presence.phase}</span>
             </div>
             {profile.presence.occupants.length > 0 && (

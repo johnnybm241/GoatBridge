@@ -147,7 +147,7 @@ export default function LobbyPage() {
   const askToJoin = (code: string) => {
     const socket = ensureSocket();
     socket.emit('request_join_table', { roomCode: code });
-    setError(`Asked the host to join ${code}. You'll be able to join once they approve.`);
+    setError('Asked the host to join. You\'ll be able to join once they approve.');
   };
 
   const acceptInvite = (code: string) => {
@@ -218,8 +218,8 @@ export default function LobbyPage() {
                   className="flex items-center justify-between bg-navy/60 border border-gold/20 rounded-lg px-4 py-3"
                 >
                   <div>
-                    <span className="text-gold font-mono font-bold tracking-widest text-lg">
-                      {room.roomCode}
+                    <span className="text-cream font-bold">
+                      Table
                     </span>
                     <span className="text-cream/50 text-xs ml-3 capitalize">
                       {room.seat} · {phaseLabel(room.phase, room.handNumber)}

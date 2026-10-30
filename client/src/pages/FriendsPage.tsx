@@ -76,7 +76,7 @@ export default function FriendsPage() {
     const what = f.presence.isSpectator ? 'Spectating' : `Playing (${f.presence.seat})`;
     return (
       <span className="text-green-400">
-        {what} · Table <span className="font-mono">{f.presence.roomCode}</span>
+        {what}
       </span>
     );
   };
