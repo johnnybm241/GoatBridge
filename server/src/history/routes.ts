@@ -100,7 +100,7 @@ function casualRowToBoard(row: CasualBoardRow): TournamentBoardRecord {
     deal: JSON.parse(row.deal_json),
     biddingCalls: JSON.parse(row.bidding_json),
     contract: JSON.parse(row.contract_json),
-    declarerSeat: row.declarer_seat as Seat,
+    declarerSeat: (row.declarer_seat || null) as Seat | null,
     tricksMade: row.tricks_made,
     nsRawScore: row.ns_raw_score,
     completedTricks: JSON.parse(row.play_json),

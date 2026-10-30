@@ -53,8 +53,8 @@ export interface TournamentBoardRecord {
   vulnerability: string;
   deal: Record<Seat, Card[]>;   // all four hands face-up
   biddingCalls: Array<{ seat: string; call: BidCall }>;
-  contract: Contract;
-  declarerSeat: Seat;
+  contract: Contract | null;    // null = passed out
+  declarerSeat: Seat | null;
   tricksMade: number;
   nsRawScore: number;           // positive = NS scored, negative = EW scored
   completedTricks: Trick[];

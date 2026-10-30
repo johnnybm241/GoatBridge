@@ -67,7 +67,7 @@ export function setupGameHandlers(
       });
 
       if (result.passedOut) {
-        dealNextHand(io, room.roomCode);
+        handlePassedOut(io, room);
         return;
       }
     }
@@ -385,7 +385,7 @@ export function handleAIBid(io: Server, roomCode: string, seat: Seat, call: BidC
     });
 
     if (result.passedOut) {
-      dealNextHand(io, roomCode);
+      handlePassedOut(io, room);
       return;
     }
   }
@@ -490,6 +490,18 @@ function dealNextHand(io: Server, roomCode: string): void {
   }, 1500);
 }
 
+/** Records a passed-out board in every format, then moves on to the next board. */
+function handlePassedOut(io: Server, room: NonNullable<ReturnType<typeof getRoom>>): void {
+  if (room.game) {
+    persistHand(room, room.game, null, 0);
+    recordHandPlayed(room);
+    handleTeamMatchBoardResult(io, room, null, room.game.handNumber, null, 0);
+    handlePairsBoardResult(io, room, room.game.handNumber, null, 0);
+  }
+  // Team and pairs rooms advance to their next pre-dealt board themselves.
+  if (!room.teamMatchCode && !room.pairsTournamentCode) dealNextHand(io, room.roomCode);
+}
+
 function recordHandPlayed(room: NonNullable<ReturnType<typeof getRoom>>): void {
   if (!room.game) return;
   for (const seat of SEATS) {
@@ -504,9 +516,9 @@ function recordHandPlayed(room: NonNullable<ReturnType<typeof getRoom>>): void {
 function handleTeamMatchBoardResult(
   io: Server,
   room: NonNullable<ReturnType<typeof getRoom>>,
-  _handScore: HandScore,
+  _handScore: HandScore | null,
   boardNumber: number,
-  contract: Contract,
+  contract: Contract | null,
   tricksMade: number,
 ): void {
   if (!room.teamMatchCode) return;
@@ -515,13 +527,16 @@ function handleTeamMatchBoardResult(
 
   // Compute the actual duplicate-style board score for IMP calculation.
   // We use scoreHand() directly rather than the rubber handScore which has
-  // partial rubber context mixed in.
-  const declarerSide: 'ns' | 'ew' =
-    (contract.declarer === 'north' || contract.declarer === 'south') ? 'ns' : 'ew';
+  // partial rubber context mixed in. A passed-out board scores 0.
   const vulnerability = room.game?.vulnerability ?? 'none';
-  const boardScore = scoreHand(contract, tricksMade, vulnerability, declarerSide);
-  // NS signed score: positive = NS won, negative = EW won
-  const nsSigned = (boardScore.nsScoreBelow + boardScore.nsScoreAbove) - (boardScore.ewScoreBelow + boardScore.ewScoreAbove);
+  let nsSigned = 0;
+  if (contract) {
+    const declarerSide: 'ns' | 'ew' =
+      (contract.declarer === 'north' || contract.declarer === 'south') ? 'ns' : 'ew';
+    const boardScore = scoreHand(contract, tricksMade, vulnerability, declarerSide);
+    // NS signed score: positive = NS won, negative = EW won
+    nsSigned = (boardScore.nsScoreBelow + boardScore.nsScoreAbove) - (boardScore.ewScoreBelow + boardScore.ewScoreAbove);
+  }
   const completedResult = recordBoardResult(match, room.roomCode, boardNumber, nsSigned);
 
   // Emit board result update to the team match lobby socket room
@@ -604,7 +619,7 @@ function handlePairsBoardResult(
   io: Server,
   room: NonNullable<ReturnType<typeof getRoom>>,
   boardNumber: number,
-  contract: Contract,
+  contract: Contract | null,
   tricksMade: number,
 ): void {
   if (!room.pairsTournamentCode) return;
@@ -623,12 +638,15 @@ function handlePairsBoardResult(
   const nsPairId = room.pairsNsPairId!;
   const ewPairId = room.pairsEwPairId!;
 
-  // Compute NS signed score
-  const declarerSide: 'ns' | 'ew' =
-    (contract.declarer === 'north' || contract.declarer === 'south') ? 'ns' : 'ew';
+  // Compute NS signed score; a passed-out board scores 0
   const vulnerability = room.game?.vulnerability ?? 'none';
-  const boardScore = scoreHand(contract, tricksMade, vulnerability, declarerSide);
-  const nsSigned = (boardScore.nsScoreBelow + boardScore.nsScoreAbove) - (boardScore.ewScoreBelow + boardScore.ewScoreAbove);
+  let nsSigned = 0;
+  if (contract) {
+    const declarerSide: 'ns' | 'ew' =
+      (contract.declarer === 'north' || contract.declarer === 'south') ? 'ns' : 'ew';
+    const boardScore = scoreHand(contract, tricksMade, vulnerability, declarerSide);
+    nsSigned = (boardScore.nsScoreBelow + boardScore.nsScoreAbove) - (boardScore.ewScoreBelow + boardScore.ewScoreAbove);
+  }
 
   // boardNumber from hand is 1-indexed within rubber; translate to tournament board number
   const boardStart = room.pairsBoardStart!;
@@ -657,7 +675,7 @@ function handlePairsBoardResult(
         deal: deal as Record<Seat, import('@goatbridge/shared').Card[]>,
         biddingCalls: room.game.bidding.calls as Array<{ seat: string; call: import('@goatbridge/shared').BidCall }>,
         contract,
-        declarerSeat: contract.declarer as Seat,
+        declarerSeat: (contract?.declarer ?? null) as Seat | null,
         tricksMade,
         nsRawScore: nsSigned,
         completedTricks: room.game.completedTricks as import('@goatbridge/shared').Trick[],
@@ -732,7 +750,7 @@ function persistTournamentBoard(tournament: import('../tournaments/tournamentMan
         JSON.stringify(board.deal),
         JSON.stringify(board.biddingCalls),
         JSON.stringify(board.contract),
-        board.declarerSeat,
+        board.declarerSeat ?? '',
         board.tricksMade,
         board.nsRawScore,
         JSON.stringify(board.completedTricks),
@@ -747,14 +765,14 @@ function persistTournamentBoard(tournament: import('../tournaments/tournamentMan
 function persistHand(
   room: NonNullable<ReturnType<typeof getRoom>>,
   game: NonNullable<GameRoom['game']>,
-  contract: NonNullable<NonNullable<GameRoom['game']>['contract']>,
+  contract: NonNullable<GameRoom['game']>['contract'],
   tricksMade: number,
 ): void {
   const roomCode = room.roomCode;
   const now = Date.now();
   try {
     const roomRecord = sqlite.get<{ id: string }>('SELECT id FROM rooms WHERE room_code = ?', [roomCode]);
-    if (roomRecord) {
+    if (roomRecord && contract) {
       sqlite.run(
         `INSERT INTO game_hands (id, room_id, hand_number, dealer, vulnerability, contract_json, declarer_seat, tricks_made, score_ns, score_ew, played_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -773,11 +791,15 @@ function persistHand(
 
   // Persist full board detail to casual_boards for history review
   try {
-    if (!room.originalHands) return;
-    const declarerSide: 'ns' | 'ew' =
-      (contract.declarer === 'north' || contract.declarer === 'south') ? 'ns' : 'ew';
-    const handScore = scoreHand(contract, tricksMade, game.vulnerability, declarerSide);
-    const nsRaw = (handScore.nsScoreBelow + handScore.nsScoreAbove) - (handScore.ewScoreBelow + handScore.ewScoreAbove);
+    // Tournament boards are stored in tournament_boards instead.
+    if (!room.originalHands || room.pairsTournamentCode) return;
+    let nsRaw = 0;
+    if (contract) {
+      const declarerSide: 'ns' | 'ew' =
+        (contract.declarer === 'north' || contract.declarer === 'south') ? 'ns' : 'ew';
+      const handScore = scoreHand(contract, tricksMade, game.vulnerability, declarerSide);
+      nsRaw = (handScore.nsScoreBelow + handScore.nsScoreAbove) - (handScore.ewScoreBelow + handScore.ewScoreAbove);
+    }
     sqlite.run(
       `INSERT OR IGNORE INTO casual_boards
         (id, room_code, hand_number, north_user_id, east_user_id, south_user_id, west_user_id,
@@ -797,7 +819,7 @@ function persistHand(
         JSON.stringify(room.originalHands),
         JSON.stringify(game.bidding.calls),
         JSON.stringify(contract),
-        contract.declarer,
+        contract?.declarer ?? '',
         tricksMade,
         nsRaw,
         JSON.stringify(game.completedTricks),

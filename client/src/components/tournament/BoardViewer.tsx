@@ -42,12 +42,14 @@ function callColor(call: { type: string; strain?: string }): string {
 
 function formatContract(board: TournamentBoardRecord): string {
   const c = board.contract;
+  if (!c) return 'Passed out';
   const strainSym: Record<string, string> = { clubs: '♣', diamonds: '♦', hearts: '♥', spades: '♠', notrump: 'NT' };
   const dbl = c.doubled === 'doubled' ? 'x' : c.doubled === 'redoubled' ? 'xx' : '';
   return `${c.level}${strainSym[c.strain] ?? c.strain}${dbl}`;
 }
 
 function formatResult(board: TournamentBoardRecord): { text: string; color: string } {
+  if (!board.contract) return { text: 'No play', color: 'text-cream/50' };
   const needed = board.contract.level + 6;
   if (board.tricksMade >= needed) {
     const over = board.tricksMade - needed;
@@ -200,7 +202,11 @@ export default function BoardViewer({ boards, pairs, onClose }: BoardViewerProps
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-cream font-bold text-base">{formatContract(board)} by {SEAT_LABEL[board.declarerSeat]}</div>
+                <div className="text-cream font-bold text-base">
+                  {board.contract && board.declarerSeat
+                    ? `${formatContract(board)} by ${SEAT_LABEL[board.declarerSeat]}`
+                    : 'Passed out'}
+                </div>
                 <div className={`font-bold text-sm ${result.color}`}>{result.text}</div>
               </div>
             </div>

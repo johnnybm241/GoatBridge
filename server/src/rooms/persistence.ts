@@ -4,11 +4,12 @@ import type { GameRoom } from '../game/stateMachine.js';
 import { listRooms, restoreRoom } from './roomManager.js';
 
 const SAVE_INTERVAL_MS = 2000;
-const MAX_SNAPSHOT_AGE_MS = 24 * 60 * 60 * 1000;
+const MAX_SNAPSHOT_AGE_MS = 2 * 60 * 60 * 1000;
 
-/** Casual tables only; tournament and team-match rooms are managed by their own flows. */
+/** Casual tables with at least one human; tournament and team-match rooms have their own flows. */
 function isPersistable(room: GameRoom): boolean {
-  return !room.teamMatchCode && !room.pairsTournamentCode;
+  if (room.teamMatchCode || room.pairsTournamentCode) return false;
+  return SEATS.some(s => room.seats[s].userId && !room.seats[s].isAI);
 }
 
 export function serializeRoom(room: GameRoom): string {
