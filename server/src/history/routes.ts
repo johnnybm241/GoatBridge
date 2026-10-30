@@ -7,6 +7,15 @@ import type { TournamentBoardRecord, Seat } from '@goatbridge/shared';
 
 const router = Router();
 
+export const HISTORY_RETENTION_MS =
+  (Number(process.env.HISTORY_RETENTION_DAYS) || 14) * 24 * 60 * 60 * 1000;
+
+export function pruneOldBoards(): void {
+  try {
+    sqlite.run('DELETE FROM casual_boards WHERE played_at < ?', [Date.now() - HISTORY_RETENTION_MS]);
+  } catch { /* non-fatal */ }
+}
+
 // All history routes require authentication
 router.use(requireAuth);
 
@@ -133,18 +142,20 @@ router.get('/', (req: AuthRequest, res: Response) => {
             COUNT(*) as board_count,
             MAX(played_at) as played_at
      FROM casual_boards
-     WHERE north_user_id = ?
-        OR east_user_id = ?
-        OR south_user_id = ?
-        OR west_user_id = ?
+     WHERE played_at >= ?
+       AND (north_user_id = ? OR east_user_id = ? OR south_user_id = ? OR west_user_id = ?)
      GROUP BY room_code
      ORDER BY MAX(played_at) DESC`,
-    [userId, userId, userId, userId],
+    [Date.now() - HISTORY_RETENTION_MS, userId, userId, userId, userId],
   );
+
+  const totalRow = sqlite.get<{ hands_played: number }>('SELECT hands_played FROM users WHERE id = ?', [userId]);
 
   res.json({
     tournaments: tournamentRows,
     casual: casualRows,
+    boardsPlayed: totalRow?.hands_played ?? 0,
+    retentionDays: Math.round(HISTORY_RETENTION_MS / 86400000),
   });
 });
 
@@ -182,9 +193,9 @@ router.get('/casual/:roomCode/boards', (req: AuthRequest, res: Response) => {
 
   const check = sqlite.get<{ cnt: number }>(
     `SELECT COUNT(*) as cnt FROM casual_boards
-     WHERE room_code = ?
+     WHERE room_code = ? AND played_at >= ?
        AND (north_user_id = ? OR east_user_id = ? OR south_user_id = ? OR west_user_id = ?)`,
-    [roomCode, userId, userId, userId, userId],
+    [roomCode, Date.now() - HISTORY_RETENTION_MS, userId, userId, userId, userId],
   );
 
   if (!check || check.cnt === 0) {
@@ -193,8 +204,8 @@ router.get('/casual/:roomCode/boards', (req: AuthRequest, res: Response) => {
   }
 
   const rows = sqlite.all<CasualBoardRow>(
-    `SELECT * FROM casual_boards WHERE room_code = ? ORDER BY hand_number ASC`,
-    [roomCode],
+    `SELECT * FROM casual_boards WHERE room_code = ? AND played_at >= ? ORDER BY hand_number ASC`,
+    [roomCode, Date.now() - HISTORY_RETENTION_MS],
   );
 
   res.json({ boards: rows.map(casualRowToBoard) });

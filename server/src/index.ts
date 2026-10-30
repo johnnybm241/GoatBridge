@@ -13,12 +13,17 @@ import roomRoutes from './rooms/routes.js';
 import teamMatchRoutes from './teamMatches/routes.js';
 import adminRoutes from './admin/routes.js';
 import tournamentRoutes from './tournaments/routes.js';
-import historyRoutes from './history/routes.js';
+import historyRoutes, { pruneOldBoards } from './history/routes.js';
 import friendRoutes from './friends/routes.js';
 import playerRoutes from './players/routes.js';
+import { restoreAllRooms, startSnapshotLoop } from './rooms/persistence.js';
+import { handleAIBid, handleAIPlay } from './socket/gameHandlers.js';
+import { scheduleAIActionIfNeeded } from './ai/aiPlayer.js';
 
 // Run DB migrations on startup
 runMigrations();
+pruneOldBoards();
+setInterval(pruneOldBoards, 60 * 60 * 1000).unref();
 
 const app = express();
 const httpServer = createServer(app);
@@ -48,6 +53,15 @@ app.get('/health', (_req, res) => res.json({ ok: true }));
 // Socket.io
 const io = createSocketServer(httpServer);
 app.set('io', io);
+
+for (const room of restoreAllRooms()) {
+  scheduleAIActionIfNeeded(
+    room,
+    (s, call) => handleAIBid(io, room.roomCode, s, call),
+    (s, card) => handleAIPlay(io, room.roomCode, s, card),
+  );
+}
+startSnapshotLoop();
 
 httpServer.listen(config.port, () => {
   console.log(`GoatBridge server running on port ${config.port}`);

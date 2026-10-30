@@ -263,6 +263,12 @@ export function runMigrations() {
     played_at INTEGER NOT NULL
   )`); } catch { /* already exists */ }
 
+  try { sqlite.exec(`CREATE TABLE IF NOT EXISTS table_snapshots (
+    room_code TEXT PRIMARY KEY,
+    state_json TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`); } catch { /* already exists */ }
+
   // Seed admin user
   try { sqlite.run("UPDATE users SET is_admin = 1, can_create_tournament = 1 WHERE lower(username) = 'johnnybm'"); } catch { /* non-fatal */ }
 

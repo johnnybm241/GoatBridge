@@ -71,6 +71,15 @@ export function deleteRoom(code: string): void {
   rooms.delete(code);
 }
 
+export function listRooms(): GameRoom[] {
+  return [...rooms.values()];
+}
+
+/** Puts a rehydrated room back into the live map. */
+export function restoreRoom(room: GameRoom): void {
+  rooms.set(room.roomCode, room);
+}
+
 export function findSeatByUserId(room: GameRoom, userId: string): Seat | null {
   for (const seat of SEATS) {
     if (room.seats[seat].userId === userId) return seat;

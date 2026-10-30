@@ -19,6 +19,8 @@ interface CasualEntry {
 interface HistoryData {
   tournaments: TournamentEntry[];
   casual: CasualEntry[];
+  boardsPlayed?: number;
+  retentionDays?: number;
 }
 
 export default function HistoryPage() {
@@ -54,7 +56,7 @@ export default function HistoryPage() {
     setLoadingKey(key);
     try {
       const res = await api.get<{ boards: TournamentBoardRecord[] }>(`/history/casual/${entry.room_code}/boards`);
-      setBoardViewer({ title: `Room ${entry.room_code}`, boards: res.data.boards });
+      setBoardViewer({ title: `Table ${formatDate(entry.played_at)}`, boards: res.data.boards });
     } catch {
       // silent
     } finally {
@@ -88,7 +90,8 @@ export default function HistoryPage() {
         <div className="mb-6">
           <h1 className="text-gold font-bold text-2xl mb-1">📋 Board History</h1>
           <p className="text-cream/50 text-sm">
-            All games you've played — review any board any time.
+            Boards from the last {data.retentionDays ?? 14} days are kept for review.
+            All-time boards played: <span className="text-gold font-semibold">{data.boardsPlayed ?? 0}</span>
           </p>
         </div>
 
@@ -159,13 +162,11 @@ export default function HistoryPage() {
                         className="bg-navy border border-gold/20 rounded-xl p-4 flex items-center justify-between gap-4"
                       >
                         <div className="min-w-0">
-                          <div className="text-cream font-semibold font-mono">{entry.room_code}</div>
+                          <div className="text-cream font-semibold">Table played {formatDate(entry.played_at)}</div>
                           <div className="flex items-center gap-3 mt-0.5">
                             <span className="text-cream/40 text-xs">
                               {entry.board_count} hand{entry.board_count !== 1 ? 's' : ''}
                             </span>
-                            <span className="text-cream/30 text-xs">·</span>
-                            <span className="text-cream/40 text-xs">{formatDate(entry.played_at)}</span>
                           </div>
                         </div>
                         <button

@@ -754,18 +754,19 @@ function persistHand(
   const now = Date.now();
   try {
     const roomRecord = sqlite.get<{ id: string }>('SELECT id FROM rooms WHERE room_code = ?', [roomCode]);
-    if (!roomRecord) return;
-    sqlite.run(
-      `INSERT INTO game_hands (id, room_id, hand_number, dealer, vulnerability, contract_json, declarer_seat, tricks_made, score_ns, score_ew, played_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        uuidv4(), roomRecord.id, game.handNumber, game.dealer, game.vulnerability,
-        JSON.stringify(contract), contract.declarer, tricksMade,
-        game.scores.nsBelowTotal + game.scores.nsAboveTotal,
-        game.scores.ewBelowTotal + game.scores.ewAboveTotal,
-        now,
-      ],
-    );
+    if (roomRecord) {
+      sqlite.run(
+        `INSERT INTO game_hands (id, room_id, hand_number, dealer, vulnerability, contract_json, declarer_seat, tricks_made, score_ns, score_ew, played_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          uuidv4(), roomRecord.id, game.handNumber, game.dealer, game.vulnerability,
+          JSON.stringify(contract), contract.declarer, tricksMade,
+          game.scores.nsBelowTotal + game.scores.nsAboveTotal,
+          game.scores.ewBelowTotal + game.scores.ewAboveTotal,
+          now,
+        ],
+      );
+    }
   } catch {
     // Non-fatal
   }
