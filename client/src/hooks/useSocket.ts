@@ -34,12 +34,7 @@ export function useSocketEvents() {
       store().setRoomVisibility(payload.visibility ?? 'public');
       if (payload.seats) {
         const yourUserId = authStore.userId;
-        for (const s of SEATS) {
-          if (payload.seats[s]?.userId === yourUserId) {
-            store().setYourSeat(s);
-            break;
-          }
-        }
+        store().setYourSeat(SEATS.find(s => payload.seats[s]?.userId === yourUserId) ?? null);
       }
     });
 

@@ -122,7 +122,7 @@ function getSeatsFromPerspective(yourSeat: Seat | null): { bottom: Seat; left: S
 
 export default function BridgeTable({
   gameState,
-  yourSeat,
+  yourSeat: seatProp,
   yourHand,
   onBid,
   onPlay,
@@ -139,6 +139,8 @@ export default function BridgeTable({
   const activeCardBackSkin = useAuthStore(s => s.activeCardBackSkin);
   const allHands = useGameStore(s => s.allHands);
   const isSpectator = useGameStore(s => s.isSpectator);
+  // Spectators always view from south, regardless of any stale seat.
+  const yourSeat = isSpectator ? null : seatProp;
   const hostUserId = useGameStore(s => s.hostUserId);
   const roomVisibility = useGameStore(s => s.roomVisibility);
 

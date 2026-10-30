@@ -26,7 +26,7 @@ interface GameStoreState {
   setRoom: (roomCode: string, hostUserId: string, isSpectator: boolean) => void;
   setHostUserId: (hostUserId: string) => void;
   setRoomVisibility: (visibility: TableVisibility) => void;
-  setYourSeat: (seat: Seat) => void;
+  setYourSeat: (seat: Seat | null) => void;
   setYourHand: (hand: Card[]) => void;
   setAllHands: (hands: Record<Seat, Card[]> | null) => void;
   setGameState: (state: GameState) => void;

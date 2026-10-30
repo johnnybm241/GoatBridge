@@ -85,9 +85,7 @@ export default function LobbyPage() {
       gameStore.setRoom(payload.roomCode, payload.hostUserId, payload.isSpectator);
       gameStore.setRoomVisibility(payload.visibility ?? 'public');
       gameStore.setRoomLobby(payload.seats, payload.kibitzingAllowed, payload.spectators);
-      for (const s of SEATS) {
-        if (payload.seats[s]?.userId === auth.userId) { gameStore.setYourSeat(s); break; }
-      }
+      gameStore.setYourSeat(SEATS.find(s => payload.seats[s]?.userId === auth.userId) ?? null);
       navigate(`/game/${payload.roomCode}`);
     };
     const onError = (payload: { message: string }) => {
@@ -137,13 +135,13 @@ export default function LobbyPage() {
     socket.emit('create_room', { visibility: newTableVisibility });
   };
 
-  const joinTable = (code: string, spectate: boolean) => {
+  const joinTable = (code: string, spectate: boolean, seat?: Seat) => {
     if (submitting) return;
     setError('');
     setSubmitting(true);
     const socket = ensureSocket();
     setupRoomRequestHandlers(socket);
-    socket.emit('join_room', { roomCode: code.toUpperCase(), spectate });
+    socket.emit('join_room', { roomCode: code.toUpperCase(), spectate, seat });
   };
 
   const askToJoin = (code: string) => {
@@ -319,13 +317,20 @@ export default function LobbyPage() {
                       </div>
                       <div className="flex gap-1.5 shrink-0">
                         {canSit && (
-                          <button
-                            onClick={() => joinTable(t.roomCode, false)}
-                            disabled={submitting}
-                            className="bg-gold hover:bg-gold/80 text-navy font-bold px-3 py-1.5 rounded-lg text-sm transition-colors"
-                          >
-                            Join
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <span className="text-cream/50 text-xs mr-1">Sit:</span>
+                            {SEATS.filter(s => !t.players.some(p => p.seat === s)).map(s => (
+                              <button
+                                key={s}
+                                onClick={() => joinTable(t.roomCode, false, s)}
+                                disabled={submitting}
+                                title={`Sit ${s}`}
+                                className="bg-gold hover:bg-gold/80 text-navy font-bold w-8 py-1.5 rounded-lg text-sm transition-colors capitalize"
+                              >
+                                {s[0].toUpperCase()}
+                              </button>
+                            ))}
+                          </div>
                         )}
                         {!canSit && t.visibility === 'invite_only' && !t.invited && (
                           <button

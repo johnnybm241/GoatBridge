@@ -148,7 +148,7 @@ export function setupRoomHandlers(
   });
 
   // Join room
-  socket.on('join_room', (payload: { roomCode: string; spectate?: boolean }) => {
+  socket.on('join_room', (payload: { roomCode: string; spectate?: boolean; seat?: Seat }) => {
     const room = getRoom(payload.roomCode);
     if (!room) {
       socket.emit('room_error', { message: 'Room not found' });
@@ -228,7 +228,8 @@ export function setupRoomHandlers(
       return;
     }
 
-    const result = joinSeat(room, userId, username, skin);
+    const requestedSeat = payload.seat && SEATS.includes(payload.seat) ? payload.seat : undefined;
+    const result = joinSeat(room, userId, username, skin, requestedSeat);
     if ('error' in result) {
       logger.warn('join_room failed', { roomCode: payload.roomCode, userId, username, error: result.error });
       socket.emit('room_error', { message: result.error });

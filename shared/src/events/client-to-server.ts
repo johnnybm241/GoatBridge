@@ -6,6 +6,7 @@ import type { TableVisibility } from '../types/social.js';
 export interface JoinRoomPayload {
   roomCode: string;
   spectate?: boolean;
+  seat?: Seat;
 }
 
 export interface LeaveRoomPayload {
