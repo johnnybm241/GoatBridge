@@ -832,7 +832,9 @@ function responderRebid(
       return { type: 'bid', level: 4, strain: opening.strain as Suit };
     }
     if (isMajor(response.strain) && shape[response.strain as Suit] >= 6) {
-      return { type: 'bid', level: 4, strain: response.strain as Suit };
+      const order = ['clubs', 'diamonds', 'hearts', 'spades', 'notrump'];
+      const threeLegal = order.indexOf(response.strain) > order.indexOf(openerRebid.strain) || openerRebid.level < 3;
+      return { type: 'bid', level: threeLegal ? 3 : 4, strain: response.strain as Suit };
     }
     return { type: 'bid', level: 3, strain: 'notrump' };
   }
