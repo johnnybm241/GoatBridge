@@ -237,6 +237,11 @@ export function setupRoomHandlers(
     }
 
     logger.info('Player joined room', { roomCode: payload.roomCode, userId, username, seat: result.seat });
+    // A spectator taking a seat stops being a spectator.
+    if (room.spectators.some(s => s.userId === userId)) {
+      room.spectators = room.spectators.filter(s => s.userId !== userId);
+      emitToRoom(io, payload.roomCode, 'spectator_left', { userId });
+    }
     socket.join(payload.roomCode);
     socketRooms.set(socket.id, payload.roomCode);
 

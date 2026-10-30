@@ -181,6 +181,7 @@ export default function BridgeTable({
         isHost={!!hostUserId && seats[seat]?.userId === hostUserId}
         locked={roomVisibility === 'invite_only'}
         trickCount={trickCount}
+        onSit={isSpectator ? () => getSocket().emit('join_room', { roomCode, seat }) : undefined}
       />
     );
   };

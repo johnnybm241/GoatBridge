@@ -9,6 +9,7 @@ interface SeatNameplateProps {
   isDummy?: boolean;
   isHost?: boolean;
   locked?: boolean;
+  onSit?: () => void;
   trickCount?: number;
 }
 
@@ -22,17 +23,23 @@ export default function SeatNameplate({
   isDummy = false,
   isHost = false,
   locked = false,
+  onSit,
   trickCount = 0,
 }: SeatNameplateProps) {
   const isEmpty = !info.userId && !info.isAI;
+  const clickable = isEmpty && !!onSit;
 
   return (
-    <div className={`
+    <div
+      onClick={clickable ? onSit : undefined}
+      title={clickable ? `Sit ${seat}` : undefined}
+      className={`
       flex items-center gap-1.5 px-2 py-1 rounded-lg border text-xs sm:text-sm sm:px-3 sm:py-1.5 2xl:text-base 2xl:px-4 2xl:py-2 2xl:gap-2
+      ${clickable ? 'cursor-pointer hover:border-gold hover:bg-gold/10' : ''}
       ${isCurrentTurn
         ? 'bg-gold/20 border-gold text-gold shadow-lg shadow-gold/20 animate-pulse'
         : 'bg-navy/60 border-gold/20 text-cream/80'}
-      ${isEmpty ? 'opacity-40' : ''}
+      ${isEmpty ? (clickable ? 'opacity-70' : 'opacity-40') : ''}
     `}>
       <div className={`
         w-5 h-5 sm:w-6 sm:h-6 2xl:w-8 2xl:h-8 rounded-full flex items-center justify-center text-xs 2xl:text-sm font-bold shrink-0
@@ -44,7 +51,7 @@ export default function SeatNameplate({
       <div className="flex flex-col leading-tight min-w-0">
         <span className="truncate max-w-[72px] sm:max-w-[100px] 2xl:max-w-[140px] font-medium">
           {isHost && !isEmpty && <span title="Table host">👑 </span>}
-          {isEmpty ? (locked ? '🔒 Empty' : 'Empty') : info.displayName}
+          {isEmpty ? (clickable ? 'Sit here' : locked ? '🔒 Empty' : 'Empty') : info.displayName}
         </span>
         <div className="flex items-center gap-1 text-[10px] sm:text-xs 2xl:text-sm text-cream/50">
           {info.isAI && <span>🤖</span>}
