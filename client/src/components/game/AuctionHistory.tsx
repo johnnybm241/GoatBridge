@@ -90,7 +90,7 @@ export default function AuctionHistory({ bidding, dealer, vulnerability, seats }
           ))}
         </tbody>
       </table>
-      <div className="text-cream/40 text-[10px] 2xl:text-xs mt-2 text-center">Hover any bid for its SAYC meaning</div>
+      <div className="text-cream/40 text-[10px] 2xl:text-xs mt-2 text-center">Hover any bid for its 2/1 meaning</div>
     </div>
   );
 }

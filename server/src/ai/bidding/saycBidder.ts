@@ -817,6 +817,25 @@ function responderRebid(
       return { type: 'bid', level: 4, strain: openerRebid.strain as Suit };
     }
   }
+  // 2/1 game force: 1X-2Y is forcing to game, so never stop below game.
+  const isGameForce =
+    opening.level === 1 && opening.strain !== 'notrump' &&
+    response.level === 2 && response.strain !== 'notrump' && response.strain !== opening.strain;
+  const openerRebidIsGame =
+    openerRebid.level >= 4 || (openerRebid.level === 3 && openerRebid.strain === 'notrump');
+  if (isGameForce && !openerRebidIsGame) {
+    const isMajor = (s: string) => s === 'hearts' || s === 'spades';
+    if (isMajor(openerRebid.strain) && shape[openerRebid.strain as Suit] >= 3) {
+      return { type: 'bid', level: 4, strain: openerRebid.strain as Suit };
+    }
+    if (isMajor(opening.strain) && shape[opening.strain as Suit] >= 3) {
+      return { type: 'bid', level: 4, strain: opening.strain as Suit };
+    }
+    if (isMajor(response.strain) && shape[response.strain as Suit] >= 6) {
+      return { type: 'bid', level: 4, strain: response.strain as Suit };
+    }
+    return { type: 'bid', level: 3, strain: 'notrump' };
+  }
   return { type: 'pass' };
 }
 

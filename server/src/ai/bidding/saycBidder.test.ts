@@ -293,6 +293,28 @@ describe('SAYC bidder — safety net', () => {
   });
 });
 
+describe('2/1 game force — responder never passes below game', () => {
+  const seq = (): BiddingState =>
+    makeBidding([
+      { seat: 'north', call: { type: 'bid', level: 1, strain: 'spades' } },
+      { seat: 'east', call: { type: 'pass' } },
+      { seat: 'south', call: { type: 'bid', level: 2, strain: 'hearts' } },
+      { seat: 'west', call: { type: 'pass' } },
+      { seat: 'north', call: { type: 'bid', level: 3, strain: 'clubs' } },
+      { seat: 'east', call: { type: 'pass' } },
+    ]);
+
+  it('1♠-2♥-3♣ does not pass', () => {
+    const hand = makeHand({ spades: 'Q2', hearts: 'AJ854', diamonds: 'K73', clubs: '842' });
+    expect(chooseBid(hand, 'south', seq()).type).toBe('bid');
+  });
+
+  it('1♠-2♥-3♣ with 3-card spade support bids 4♠', () => {
+    const hand = makeHand({ spades: 'Q82', hearts: 'AJ854', diamonds: 'K7', clubs: '842' });
+    expect(chooseBid(hand, 'south', seq())).toEqual({ type: 'bid', level: 4, strain: 'spades' });
+  });
+});
+
 describe('SAYC bidder — New Minor Forcing (NMF)', () => {
   // 1♣ – P – 1♠ – P – 1NT – P – ?  (responder's rebid)
   const seq1C_P_1S_P_1NT_P = (): BiddingState =>

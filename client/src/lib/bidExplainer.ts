@@ -235,7 +235,7 @@ function explainResponse(call: BidCall, opening: LevelBid, byPartner: boolean): 
   }
   if (level === 1) return `New suit at the 1-level: 6+ HCP, 4+ cards in ${STRAIN_NAME[strain]}, forcing one round.`;
   if (level === 2 && opening.level === 1)
-    return `Two-over-one: 11+ HCP (game-forcing in modern SAYC), 5+ ${STRAIN_NAME[strain]}.`;
+    return `Two-over-one: 11+ HCP (game-forcing in 2/1), 5+ ${STRAIN_NAME[strain]}.`;
 
   return `Bid ${level}${strain === 'notrump' ? 'NT' : STRAIN_NAME[strain]} in response to partner’s opening.`;
 }
@@ -523,7 +523,7 @@ function explainOvercallerRebid(
 }
 
 /**
- * Explain a bid at position `index` in the auction using SAYC conventions.
+ * Explain a bid at position `index` in the auction using 2/1 Game Forcing conventions.
  * Explanations are heuristic and mirror the server's saycBidder logic —
  * they are best-effort descriptions, not a guaranteed 1:1 with the bot's internals.
  */
@@ -605,7 +605,7 @@ export function explainBidAt(
   // First bid of the auction
   if (openingIdx === index) return explainOpening(call);
 
-  // Doubles / redoubles have their own SAYC rules
+  // Doubles / redoubles have their own 2/1 rules
   if (call.type === 'double') {
     if (role.kind === 'competitive-rebid' || priorNonPassCallsBySeatBefore > 0) {
       return 'Competitive double: extra values consistent with the hand already shown earlier in the auction.';
