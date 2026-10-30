@@ -69,8 +69,8 @@ export default function HostAdminPanel({
     <div className="bg-navy/80 border border-gold/30 rounded-xl p-4 space-y-4">
       <div className="text-gold font-bold text-sm">Host Controls</div>
 
-      {/* Bot management */}
-      {!isGameInProgress && (
+      {/* Seat management (available mid-match too) */}
+      {(
         <div>
           <div className="text-cream/60 text-xs mb-2">Seat Management</div>
           <div className="grid grid-cols-2 gap-2">

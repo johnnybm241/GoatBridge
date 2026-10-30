@@ -29,6 +29,12 @@ function makeEmptySeat(seat: Seat): SeatInfo {
   };
 }
 
+/** Replaces a seat's occupant, keeping the in-progress hand's seat snapshot in step. */
+function setSeat(room: GameRoom, seat: Seat, info: SeatInfo): void {
+  room.seats[seat] = info;
+  if (room.game) room.game.seats[seat] = info;
+}
+
 export function createRoom(hostUserId: string, visibility: TableVisibility = 'public'): GameRoom {
   let code = generateRoomCode();
   while (rooms.has(code)) code = generateRoomCode();
@@ -95,7 +101,7 @@ export function joinSeat(
     return { error: 'Seat already taken' };
   }
 
-  room.seats[targetSeat] = {
+  setSeat(room, targetSeat, {
     seat: targetSeat,
     userId,
     displayName,
@@ -106,7 +112,7 @@ export function joinSeat(
     originalUserId: null,
     activeCardBackSkin: skin,
     joinedAt: Date.now(),
-  };
+  });
 
   return { seat: targetSeat };
 }
@@ -116,7 +122,7 @@ export function addBot(room: GameRoom, seat: Seat): boolean {
   const botNames = ['Garry Bot', 'Magnus Bot', 'Judy Bot', 'Omar Bot'];
   const botName = botNames[SEATS.indexOf(seat)] ?? 'AI Bot';
 
-  room.seats[seat] = {
+  setSeat(room, seat, {
     seat,
     userId: `bot-${seat}`,
     displayName: botName,
@@ -127,13 +133,13 @@ export function addBot(room: GameRoom, seat: Seat): boolean {
     originalUserId: null,
     activeCardBackSkin: 'classic',
     joinedAt: null,
-  };
+  });
   return true;
 }
 
 export function removeBot(room: GameRoom, seat: Seat): boolean {
   if (!room.seats[seat].isAI) return false;
-  room.seats[seat] = makeEmptySeat(seat);
+  setSeat(room, seat, makeEmptySeat(seat));
   return true;
 }
 
@@ -154,7 +160,7 @@ export function inviteUser(room: GameRoom, userId: string): void {
 
 /** Clears a seat, keeping the room's seat map shape intact. */
 export function vacateSeat(room: GameRoom, seat: Seat): void {
-  room.seats[seat] = makeEmptySeat(seat);
+  setSeat(room, seat, makeEmptySeat(seat));
 }
 
 /**

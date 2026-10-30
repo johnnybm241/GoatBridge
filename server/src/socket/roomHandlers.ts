@@ -61,6 +61,44 @@ function handleHostDeparture(io: Server, room: GameRoom, departingUserId: string
   });
 }
 
+function broadcastRoomUpdate(io: Server, room: GameRoom): void {
+  emitToRoom(io, room.roomCode, 'room_updated', {
+    seats: room.seats,
+    status: room.game?.phase ?? 'waiting',
+    kibitzingAllowed: room.kibitzingAllowed,
+    spectators: room.spectators,
+  });
+}
+
+/** Takes a user's live socket out of the room so they stop receiving its events. */
+function detachSocket(io: Server, userId: string, roomCode: string): void {
+  const socketId = getSocketId(userId);
+  if (!socketId) return;
+  io.sockets.sockets.get(socketId)?.leave(roomCode);
+  if (socketRooms.get(socketId) === roomCode) socketRooms.delete(socketId);
+}
+
+function clearDisconnectTimer(roomCode: string, seat: Seat): void {
+  const key = `${roomCode}:${seat}`;
+  const timer = disconnectTimers.get(key);
+  if (timer) clearTimeout(timer);
+  disconnectTimers.delete(key);
+}
+
+/** Removes a seated player or spectator immediately (no 60s grace period). */
+function removeUserFromRoom(io: Server, room: GameRoom, targetUserId: string): void {
+  const seat = findSeatByUserId(room, targetUserId);
+  if (seat) {
+    clearDisconnectTimer(room.roomCode, seat);
+    vacateSeat(room, seat);
+  } else {
+    room.spectators = room.spectators.filter(s => s.userId !== targetUserId);
+    emitToRoom(io, room.roomCode, 'spectator_left', { userId: targetUserId });
+  }
+  handleHostDeparture(io, room, targetUserId);
+  if (getRoom(room.roomCode)) broadcastRoomUpdate(io, room);
+}
+
 export function setupRoomHandlers(
   io: Server,
   socket: Socket & { data: { userId: string; username: string } },
@@ -149,6 +187,7 @@ export function setupRoomHandlers(
       emitToRoom(io, payload.roomCode, 'spectator_joined', {
         spectator: { userId, displayName: username },
       });
+      broadcastRoomUpdate(io, room);
       return;
     }
 
@@ -239,12 +278,13 @@ export function setupRoomHandlers(
       return;
     }
     logger.info('Bot added', { roomCode: payload.roomCode, seat: payload.seat });
-    emitToRoom(io, payload.roomCode, 'room_updated', {
-      seats: room.seats,
-      status: 'waiting',
-      kibitzingAllowed: room.kibitzingAllowed,
-      spectators: room.spectators,
-    });
+    broadcastRoomUpdate(io, room);
+    // Mid-hand, a bot dropped into the seat whose turn it is must act.
+    scheduleAIActionIfNeeded(
+      room,
+      (s, call) => onBid(room, s, call),
+      (s, card) => onPlay(room, s, card),
+    );
   });
 
   // Remove bot
@@ -255,12 +295,7 @@ export function setupRoomHandlers(
       return;
     }
     removeBot(room, payload.seat);
-    emitToRoom(io, payload.roomCode, 'room_updated', {
-      seats: room.seats,
-      status: 'waiting',
-      kibitzingAllowed: room.kibitzingAllowed,
-      spectators: room.spectators,
-    });
+    broadcastRoomUpdate(io, room);
   });
 
   // Start game
@@ -319,9 +354,12 @@ export function setupRoomHandlers(
       socket.emit('room_error', { message: 'Not authorized' });
       return;
     }
+    if (payload.userId === room.hostUserId) return;
     emitToUser(io, payload.userId, 'kicked', undefined);
+    detachSocket(io, payload.userId, room.roomCode);
     room.spectators = room.spectators.filter(s => s.userId !== payload.userId);
     emitToRoom(io, payload.roomCode, 'spectator_left', { userId: payload.userId });
+    broadcastRoomUpdate(io, room);
   });
 
   // Host invites a player to the table
@@ -395,16 +433,24 @@ export function setupRoomHandlers(
     // Revoke the invite too, so they can't immediately walk back into an
     // invite-only table after being removed.
     room.invitedUserIds = room.invitedUserIds.filter(id => id !== targetUserId);
-    vacateSeat(room, payload.seat);
 
     emitToUser(io, targetUserId, 'kicked', undefined);
-    emitToRoom(io, payload.roomCode, 'room_updated', {
-      seats: room.seats,
-      status: room.game?.phase ?? 'waiting',
-      kibitzingAllowed: room.kibitzingAllowed,
-      spectators: room.spectators,
-    });
+    detachSocket(io, targetUserId, room.roomCode);
+    removeUserFromRoom(io, room, targetUserId);
     logger.info('Player kicked', { roomCode: room.roomCode, seat: payload.seat, by: userId });
+  });
+
+  // Voluntary leave: free the seat (or spectator slot) right away
+  socket.on('leave_room', (payload: { roomCode: string }) => {
+    const room = getRoom(payload.roomCode);
+    if (!room) return;
+    const present = findSeatByUserId(room, userId) || room.spectators.some(s => s.userId === userId);
+    if (!present) return;
+
+    socket.leave(room.roomCode);
+    socketRooms.delete(socket.id);
+    removeUserFromRoom(io, room, userId);
+    logger.info('Player left room', { roomCode: room.roomCode, userId });
   });
 
   // Host changes who may join

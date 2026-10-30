@@ -95,6 +95,24 @@ export default function GamePage() {
     }
   }, [roomCode, auth.token]);
 
+  const leaveTable = useCallback(() => {
+    if (roomCode) getSocket().emit('leave_room', { roomCode });
+    useGameStore.getState().reset();
+    navigate('/');
+  }, [roomCode, navigate]);
+
+  // Host removed us from the table
+  useEffect(() => {
+    let socket: ReturnType<typeof getSocket>;
+    try { socket = getSocket(); } catch { return; }
+    const onKicked = () => {
+      useGameStore.getState().reset();
+      navigate('/');
+    };
+    socket.on('kicked', onKicked);
+    return () => { socket.off('kicked', onKicked); };
+  }, [navigate]);
+
   const handleBid = (call: BidCall) => {
     if (!roomCode) return;
     getSocket().emit('make_bid', { roomCode, call });
@@ -129,19 +147,27 @@ export default function GamePage() {
             Room: <span className="text-gold font-mono font-bold tracking-widest">{roomCode}</span>
             {isSpectator && <span className="ml-2 text-blue-400">(Spectating)</span>}
           </div>
-          {gameState && (
-            <div className="text-cream/50">
-              Hand #{gameState.handNumber} •{' '}
-              <span className={
-                gameState.vulnerability === 'both' ? 'text-red-400' :
-                gameState.vulnerability === 'none' ? 'text-cream/50' : 'text-red-400'
-              }>
-                {gameState.vulnerability === 'none' ? 'None vul' :
-                 gameState.vulnerability === 'both' ? 'All vul' :
-                 `${gameState.vulnerability.toUpperCase()} vul`}
-              </span>
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            {gameState && (
+              <div className="text-cream/50">
+                Hand #{gameState.handNumber} •{' '}
+                <span className={
+                  gameState.vulnerability === 'both' ? 'text-red-400' :
+                  gameState.vulnerability === 'none' ? 'text-cream/50' : 'text-red-400'
+                }>
+                  {gameState.vulnerability === 'none' ? 'None vul' :
+                   gameState.vulnerability === 'both' ? 'All vul' :
+                   `${gameState.vulnerability.toUpperCase()} vul`}
+                </span>
+              </div>
+            )}
+            <button
+              onClick={leaveTable}
+              className="px-2 py-0.5 rounded border border-red-400/40 text-red-300 hover:bg-red-500/20 text-xs"
+            >
+              Leave table
+            </button>
+          </div>
         </div>
 
         {/* Bridge table */}
@@ -228,10 +254,23 @@ export default function GamePage() {
 }
 
 function WaitingRoom({ isHost, visibility }: { isHost: boolean; visibility: TableVisibility }) {
+  const roomSeats = useGameStore(s => s.roomSeats);
   return (
     <div className="felt-texture rounded-2xl h-full flex flex-col items-center justify-center gap-4 text-cream/70 border-4 border-felt-dark/50">
       <div className="text-6xl">🐐</div>
       <div className="text-2xl font-bold text-gold">Waiting for players…</div>
+      <div className="grid grid-cols-2 gap-2">
+        {SEATS.map(seat => {
+          const info = roomSeats?.[seat];
+          const empty = !info?.userId && !info?.isAI;
+          return (
+            <div key={seat} className={`px-3 py-1.5 rounded-lg border border-gold/20 bg-navy/60 text-sm min-w-[130px] ${empty ? 'opacity-50' : ''}`}>
+              <span className="uppercase text-cream/40 text-xs mr-2">{seat[0]}</span>
+              {empty ? (visibility === 'invite_only' ? '🔒 Empty' : 'Empty') : `${info?.isAI ? '🤖 ' : ''}${info?.displayName}`}
+            </div>
+          );
+        })}
+      </div>
       <div className="text-sm">
         {visibility === 'public'
           ? 'This table is listed in the lobby — anyone can take a free seat.'
