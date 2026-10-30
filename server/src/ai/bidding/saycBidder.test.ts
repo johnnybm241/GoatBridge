@@ -81,6 +81,18 @@ describe('SAYC bidder — opening bids', () => {
     expect(bid).toEqual({ type: 'pass' });
   });
 
+  it('Rule of 15: 4th seat opens 1♠ with 10 HCP + 5 spades', () => {
+    const hand = makeHand({ spades: 'AQ854', hearts: 'K32', diamonds: 'J72', clubs: '74' });
+    const passes = (['north', 'east', 'south'] as Seat[]).map(seat => ({ seat, call: { type: 'pass' } as BidCall }));
+    expect(chooseBid(hand, 'west', makeBidding(passes))).toEqual({ type: 'bid', level: 1, strain: 'spades' });
+  });
+
+  it('Rule of 15: 4th seat passes at 14', () => {
+    const hand = makeHand({ spades: 'AQ84', hearts: 'K32', diamonds: 'J762', clubs: '74' });
+    const passes = (['north', 'east', 'south'] as Seat[]).map(seat => ({ seat, call: { type: 'pass' } as BidCall }));
+    expect(chooseBid(hand, 'west', makeBidding(passes))).toEqual({ type: 'pass' });
+  });
+
   it('passes with fewer than 12 HCP', () => {
     const hand = makeHand({ spades: 'K84', hearts: 'Q73', diamonds: 'J652', clubs: '542' });
     const bid = chooseBid(hand, 'south', makeBidding([]));

@@ -307,8 +307,17 @@ function classifyRole(seat: Seat, bidding: BiddingState): Role {
 // Opening bids
 // ────────────────────────────────────────────────────────────────────────────
 
-function openingBid(eval_: HandEvaluation): BidCall {
+function openingBid(eval_: HandEvaluation, fourthSeat = false): BidCall {
   const { hcp, isBalanced, shape } = eval_;
+
+  // 4th seat (all passed): preempts are pointless; Rule of 15 = HCP + spades >= 15
+  if (fourthSeat && hcp < 12 && !(isBalanced && hcp >= 15)) {
+    if (hcp + shape.spades < 15) return { type: 'pass' };
+    if (shape.spades >= 5 && shape.spades >= shape.hearts) return { type: 'bid', level: 1, strain: 'spades' };
+    if (shape.hearts >= 5) return { type: 'bid', level: 1, strain: 'hearts' };
+    if (shape.diamonds >= shape.clubs) return { type: 'bid', level: 1, strain: 'diamonds' };
+    return { type: 'bid', level: 1, strain: 'clubs' };
+  }
 
   if (hcp >= 22) return { type: 'bid', level: 2, strain: 'clubs' };
 
@@ -1208,7 +1217,10 @@ export function chooseBid(
   let chosen: BidCall;
   switch (role.kind) {
     case 'opening':
-      chosen = openingBid(eval_);
+      chosen = openingBid(
+        eval_,
+        bidding.calls.length === 3 && bidding.calls.every(c => c.call.type === 'pass'),
+      );
       break;
     case 'responder-first':
       chosen = responderFirst(eval_, role.opening.call, role.interference);
